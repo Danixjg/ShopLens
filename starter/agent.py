@@ -7,6 +7,9 @@ from pathlib import Path
 
 
 TOKEN_RE = re.compile(r"[a-z0-9]+", re.IGNORECASE)
+# Deterministic clarification cycle: feature → material → color (repeats every 3 turns).
+# Index is (turn - 1) % 3 where turn is 1-based.
+CLARIFICATION_CYCLE: tuple[str, ...] = ("feature", "material", "color")
 STOPWORDS = {
     "a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "from",
     "i", "in", "is", "it", "me", "my", "of", "on", "or", "please", "some",
@@ -94,9 +97,10 @@ class Agent:
                 (expression, top_k),
             ).fetchall()
             recommendations = [{"parent_asin": str(row[0])} for row in rows]
+        ask_attribute = CLARIFICATION_CYCLE[(turn - 1) % len(CLARIFICATION_CYCLE)]
         return {
             "message": "Here are the closest matches I found.",
-            "ask_attribute": None,
+            "ask_attribute": ask_attribute,
             "recommendations": recommendations,
             "usage": {"prompt_tokens": 0, "completion_tokens": 0},
         }
