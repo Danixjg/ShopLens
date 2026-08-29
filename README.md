@@ -83,6 +83,19 @@ CPython 3.12, Linux x86-64:
 python3 -m pip install -r requirements-dense.lock.txt
 ```
 
+`pip` is the canonical path and requires no tooling beyond the standard
+library. If [uv](https://github.com/astral-sh/uv) is available it installs the
+same lock substantially faster, and the resulting environment is equivalent:
+
+```bash
+uv venv --python 3.12 .venv-dense
+uv pip install --python .venv-dense/bin/python -r requirements-dense.lock.txt
+```
+
+Both routes resolve to the identical package set, so `requirements_lock_sha256`
+and `requirements_lock_mismatches` in reportable evidence are unchanged. uv is
+an optional convenience; it is never required to reproduce results.
+
 The default `data/catalog.jsonl` path automatically verifies the pinned
 decompressed release digest. For a custom catalog path, request the same
 load-time protection by setting its digest:
