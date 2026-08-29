@@ -48,7 +48,7 @@ and model provenance. Full attribution is in `DATA_ATTRIBUTION.md`.
 Clean commit `be4017aa` remains the canonical reportable baseline: F scored
 `0.712658` on the 120-session dev split and `0.719476` on the 80-session
 holdout. The accuracy candidate was then frozen after dev-only tuning and
-opened on holdout once. In isolated true-hybrid validation, config P scored
+opened on holdout once. In canonical true-hybrid evaluation, config P scored
 `0.819939` on dev (HR@10 `0.941667`, MRR `0.639239`, MTTC `3.133333`) and
 `0.843958` on holdout (HR@10 `0.975`, MRR `0.644861`, MTTC `2.85`). The
 120/80 weighted public estimate is `0.829546`.
@@ -58,14 +58,27 @@ preserving HR/MTTC. A paired, scenario-stratified 10,000-resample bootstrap
 (seed 2026) put its TechnicalScore gain at `0.019567`, with a 95% interval of
 `[0.010258, 0.029980]`.
 
-Those P rows are explicitly diagnostic until regenerated from a clean
-implementation commit. They used the pinned CPU model and identical catalog,
-dataset, model, cache, and embedding-content digests, with zero agent or
-evaluator response exceptions and $0 API cost. Boundary HR@10 moved from the
-historical F `0.166667/0.25` to candidate P `1.0/0.75` on dev/holdout; Buying,
-Browsing, and Intent Override also improved or held in aggregate. Configs G
-and H are not claimed because no plan-specified offline cross-encoder or LLM
-provider exists.
+The next dev-only candidate, Q, adds a bounded log-scaled rating-count prior
+inside P's already-frozen Top-10. It preserves P's relevance score and adds a
+maximum-weighted `0.15 * popularity / 61` bonus, without filtering products or
+changing catalog membership. Q scored `0.862083` on dev (HR@10 `0.941667`, MRR
+`0.779722`, MTTC `3.133333`): 50 target ranks improved, none regressed, and all
+four scenario MRRs increased. Q has not been opened on holdout and is not yet
+claimed as the retained configuration. The idea followed an aggregate review
+of target rating counts across all public sessions, so any eventual Q holdout
+result will be disclosed as exploratory rather than statistically untouched.
+A paired, scenario-stratified 10,000-resample bootstrap (seed 2026) estimated
+Q's dev TechnicalScore gain over P at `0.042145`, with a 95% interval of
+`[0.030926, 0.054362]`.
+
+The P rows are clean canonical evidence in `results.jsonl`; Q remains a dirty
+dev diagnostic until its implementation is committed and rerun. P used the
+pinned CPU model and identical catalog, dataset, model, cache, and embedding-
+content digests, with zero agent or evaluator response exceptions and $0 API
+cost. Boundary HR@10 moved from the historical F `0.166667/0.25` to P
+`1.0/0.75` on dev/holdout; Buying, Browsing, and Intent Override also improved
+or held in aggregate. Configs G and H are not claimed because no plan-specified
+offline cross-encoder or LLM provider exists.
 
 ## Limitations and future work
 
@@ -74,6 +87,8 @@ provider exists.
 - The deterministic parser is tailored to controlled simulator language, not
   arbitrary noisy commerce conversations.
 - Sparse catalog metadata makes some constraints, especially color, unreliable.
+- Q favors established products over niche or newly listed products, and the
+  public target construction may amplify that popularity bias.
 - The optional cross-encoder and LLM-ranking experiments are not claimed until
   a specific offline model/provider, cost, and measured benefit exist.
 - Aggregate profile fields contain weak signal and never override explicit
