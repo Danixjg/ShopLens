@@ -13,6 +13,7 @@ from src.contracts.config import CONFIGS, get_run_config
 from src.contracts.response import AgentReply, Recommendation, Usage
 from src.contracts.retrieval import Candidate, RetrievalQuery
 from src.contracts.state import SessionState
+from src.eval.runner import _capability_status
 from src.eval.split import stratified_dev_holdout_split
 from src.parsing import OVERRIDE_MARKER, TurnParser
 from src.policy import ClarificationPolicy
@@ -140,6 +141,31 @@ def test_parser_recognizes_boundary_signal_only() -> None:
     assert boundary.declined_attribute == "feature"
     assert ordinary.declined_attribute is None
     assert boundary.soft_preferences == {}
+
+
+def test_runner_rejects_unavailable_requested_capability(catalog_path: Path) -> None:
+    agent = SubmissionAgent(catalog_path, config=CONFIGS["G"])
+    status, reasons = _capability_status(agent)
+    assert status["reranker"]["ready"] is False
+    assert "requested local cross-encoder is unavailable" in reasons
+
+
+def test_agent_counts_guarded_response_failures(
+    catalog_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    agent = SubmissionAgent(catalog_path)
+    agent.reset("session", {})
+
+    def fail(*args: object, **kwargs: object) -> dict:
+        raise RuntimeError("synthetic failure")
+
+    monkeypatch.setattr(agent, "_respond", fail)
+    reply = agent.respond("session", "boots", 1, 10)
+    assert reply["recommendations"]
+    assert agent.exception_count == 1
+    status, reasons = _capability_status(agent)
+    assert status["agent_exception_count"] == 1
+    assert reasons == ["agent fallback handled 1 unexpected exception(s)"]
 
 
 def test_clarification_reply_preserves_buying_route() -> None:

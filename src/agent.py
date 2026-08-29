@@ -47,6 +47,7 @@ class Agent:
         self.parser = TurnParser()
         self.policy = ClarificationPolicy(self.config)
         self._sessions: dict[str, SessionState] = {}
+        self.exception_count = 0
 
     def reset(self, session_id: str, user_profile: dict) -> None:
         self._sessions[str(session_id)] = SessionState(
@@ -122,6 +123,7 @@ class Agent:
         try:
             return self._respond(session_id, user_message, turn, top_k)
         except Exception:
+            self.exception_count += 1
             state = self._state_for(session_id)
             safe_k = max(1, min(10, top_k if isinstance(top_k, int) else 10))
             asins = self._fallback_asins(state, safe_k)

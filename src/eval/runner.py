@@ -86,6 +86,52 @@ def _embedding_cache_status(agent: Agent) -> str:
     return str(getattr(retriever, "cache_status", "not_used"))
 
 
+def _capability_status(agent: Agent) -> tuple[dict[str, object], list[str]]:
+    effective_retriever = _effective_retriever(agent)
+    expected_retriever = agent.config.retrieval_mode
+    retriever_ready = effective_retriever == expected_retriever
+
+    reranker_requested = agent.config.reranker == "local_cross_encoder"
+    reranker_ready = bool(
+        reranker_requested
+        and agent.reranker is not None
+        and getattr(agent.reranker, "_model", None) is not None
+    )
+    effective_reranker = "local_cross_encoder" if reranker_ready else "none"
+
+    # No LLM ranking implementation/provider is shipped. Keep H visible in the
+    # matrix without presenting the unchanged offline path as an LLM result.
+    llm_ready = False
+    reasons: list[str] = []
+    if not retriever_ready:
+        reasons.append(f"requested {expected_retriever} retrieval, used {effective_retriever}")
+    if reranker_requested and not reranker_ready:
+        reasons.append("requested local cross-encoder is unavailable")
+    if agent.config.llm_rank and not llm_ready:
+        reasons.append("requested LLM rank is not implemented")
+    if agent.exception_count:
+        reasons.append(f"agent fallback handled {agent.exception_count} unexpected exception(s)")
+
+    return {
+        "retriever": {
+            "requested": expected_retriever,
+            "effective": effective_retriever,
+            "ready": retriever_ready,
+        },
+        "reranker": {
+            "requested": agent.config.reranker,
+            "effective": effective_reranker,
+            "ready": not reranker_requested or reranker_ready,
+        },
+        "llm_rank": {
+            "requested": agent.config.llm_rank,
+            "effective": llm_ready,
+            "ready": not agent.config.llm_rank or llm_ready,
+        },
+        "agent_exception_count": agent.exception_count,
+    }, reasons
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run a reproducible ShopLens ablation")
     parser.add_argument("--catalog", default="data/catalog.jsonl")
@@ -116,16 +162,22 @@ def main() -> None:
     agent = Agent(args.catalog, config=config)
     result = evaluate(agent, selected, catalog_ids, categories, products)
     elapsed_seconds = time.perf_counter() - started
+    capability_status, reportability_reasons = _capability_status(agent)
+    if dirty is not False:
+        reportability_reasons.insert(0, "Git tree is not clean")
+    reportable = not reportability_reasons
     record = {
         "config": config.name,
         "split": args.split,
         "scores": _scores_only(result),
         "git_sha": _git_sha(),
-        "reportable": dirty is False,
+        "reportable": reportable,
+        "reportability_reasons": reportability_reasons,
         "reproducibility": {
             "git_dirty": dirty,
             "config_flags": asdict(config),
             "effective_retriever": _effective_retriever(agent),
+            "capability_status": capability_status,
             "python": platform.python_version(),
             "dependencies": {
                 "numpy": _package_version("numpy"),
