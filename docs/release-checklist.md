@@ -14,8 +14,10 @@
 ## Reproduction and evidence
 
 - [ ] A clean install reproduces config A without optional dependencies.
-- [ ] The locked dense environment reproduces configs B–H and P fully offline.
+- [ ] The locked dense environment reproduces configs B–H, P, and Q fully offline.
 - [ ] Clean reportable dev and holdout runs exist for retained config P.
+- [ ] Config Q has dev evidence, exact P/Q membership parity, and an explicitly
+      exploratory holdout result before it replaces P as the retained config.
 - [x] Historical canonical `be4017aa` rows record a clean Git SHA and `reportable: true`.
 - [ ] New canonical results include config flags, effective capabilities, guarded
       exception count, dependency/model versions, catalog/dataset digests,

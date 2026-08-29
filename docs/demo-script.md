@@ -5,8 +5,9 @@ third-party media.
 
 1. Introduce the problem: keyword search misses evolving intent, while a
    shopping agent must rank the purchased product quickly within ten turns.
-2. Show `plan.md` simulator findings: clarification and recommendations share a
-   turn; silence stalls; overrides require slot erasure.
+2. State the simulator findings that shaped the design: clarification and
+   recommendations share a turn; silence stalls; overrides require slot
+   erasure. Narrate these — do not put an internal working document on screen.
 3. Show the architecture diagram in `README.md` and explain the Buying versus
    Browsing route, recoverable constraint scoring, and offline model.
 4. Run the API walkthrough. Use the interpreter that has
@@ -14,8 +15,8 @@ third-party media.
    matching the README setup. Either invocation works:
 
    ```bash
-   .venv-dense/bin/python scripts/demo_session.py --config P
-   .venv-dense/bin/python -m scripts.demo_session --config P
+   .venv-dense/bin/python scripts/demo_session.py --config Q
+   .venv-dense/bin/python -m scripts.demo_session --config Q
    ```
 
    A stock `python3` without the dense dependencies is **not** usable for
@@ -24,7 +25,7 @@ third-party media.
    script refuses rather than letting that happen, and exits non-zero:
 
    ```
-   config P requests hybrid retrieval but this interpreter provides bm25.
+   config Q requests hybrid retrieval but this interpreter provides bm25.
    ```
 
    If that message appears, stop and fix the environment; do not record around
@@ -39,7 +40,7 @@ third-party media.
    same interpreter:
 
    ```bash
-   .venv-dense/bin/python -m src.eval.runner --config P --split holdout
+   .venv-dense/bin/python -m src.eval.runner --config Q --split holdout
    ```
 
    This run must be made from a clean tree; the runner refuses to append
