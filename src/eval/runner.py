@@ -194,8 +194,36 @@ def _locked_environment_mismatches(path: Path) -> list[str]:
     return _locked_environment_snapshot(path)[1]
 
 
+def _lock_entries(text: str) -> list[str]:
+    """Logical requirement entries, joining backslash line continuations.
+
+    A hash-pinned entry spans several physical lines: ``name==version \\`` then
+    one indented ``--hash=`` option per acceptable artifact.
+    """
+    entries: list[str] = []
+    pending: list[str] = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        continued = line.endswith("\\")
+        pending.append(line[:-1].strip() if continued else line)
+        if not continued:
+            entries.append(" ".join(part for part in pending if part))
+            pending.clear()
+    if pending:
+        entries.append(" ".join(part for part in pending if part))
+    return entries
+
+
 def _locked_environment_snapshot(path: Path) -> tuple[str | None, list[str]]:
-    """Hash and validate one immutable view of the reference lock."""
+    """Hash and validate one immutable view of the reference lock.
+
+    Every entry must pin an artifact digest, not only a version number. A
+    version pin lets a later resolution install different bytes under the same
+    name; recording the difference afterwards diagnoses it but does not prevent
+    it. Requiring ``--hash`` is what makes two installations reproduce.
+    """
     try:
         contents = path.read_bytes()
     except OSError:
@@ -206,13 +234,14 @@ def _locked_environment_snapshot(path: Path) -> tuple[str | None, list[str]]:
     except UnicodeDecodeError:
         return digest, ["lock file is not valid UTF-8"]
     mismatches: list[str] = []
-    for raw_line in text.splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#"):
-            continue
-        name, separator, expected = line.partition("==")
+    for entry in _lock_entries(text):
+        tokens = entry.split()
+        name, separator, expected = tokens[0].partition("==")
         if not separator or not name or not expected:
-            mismatches.append(f"unsupported lock entry: {line}")
+            mismatches.append(f"unsupported lock entry: {entry}")
+            continue
+        if not any(token.startswith("--hash=") for token in tokens[1:]):
+            mismatches.append(f"{name}: lock entry is not hash-pinned")
             continue
         actual = _package_version(name)
         if actual != expected:
