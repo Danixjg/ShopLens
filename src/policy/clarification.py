@@ -10,6 +10,20 @@ from src.contracts.state import SessionState
 CLARIFICATION_SEQUENCE: tuple[AskAttribute, ...] = ("feature", "material", "color")
 
 
+def _satisfies_hard_constraints(candidate: Candidate) -> bool:
+    """True when no disclosed hard constraint penalised this candidate.
+
+    ``ConstraintScorer`` records a negative ``hard_<attribute>`` component for
+    every violated hard constraint. Candidates without hard components (configs
+    that skip constraint scoring) are treated as viable.
+    """
+    return all(
+        value >= 0
+        for key, value in candidate.components.items()
+        if key.startswith("hard_")
+    )
+
+
 class ClarificationPolicy:
     def __init__(self, config: RunConfig) -> None:
         self.config = config
@@ -28,8 +42,18 @@ class ClarificationPolicy:
 
     @staticmethod
     def is_over_general(candidates: list[Candidate], recommendation_limit: int) -> bool:
-        """Detect a candidate pool larger than the response can expose."""
-        return recommendation_limit > 0 and len(candidates) > recommendation_limit
+        """Detect more constraint-satisfying matches than the response can expose.
+
+        The candidate pool passed here is the pre-truncation retrieval depth,
+        which is deliberately over-fetched for constraint scoring. Counting the
+        raw pool would flag over-generality on nearly every turn, so we count
+        only viable matches -- candidates that satisfy every disclosed hard
+        constraint (no negative ``hard_*`` scoring component).
+        """
+        if recommendation_limit <= 0:
+            return False
+        viable = sum(1 for candidate in candidates if _satisfies_hard_constraints(candidate))
+        return viable > recommendation_limit
 
     @staticmethod
     def message(attribute: AskAttribute | None, over_general: bool = False) -> str:

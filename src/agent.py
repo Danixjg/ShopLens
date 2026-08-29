@@ -24,18 +24,15 @@ class Agent:
         config: RunConfig | str | None = None,
     ) -> None:
         self.config = config if isinstance(config, RunConfig) else get_run_config(config)
-        expected_checksum = os.getenv("SHOPLENS_CATALOG_SHA256") or None
+        explicit_checksum = os.getenv("SHOPLENS_CATALOG_SHA256") or None
         skip_pinned_check = os.getenv("SHOPLENS_SKIP_CATALOG_VERIFY", "").lower() in {
             "1", "true", "yes",
         }
         catalog = Path(catalog_path)
-        if (
-            expected_checksum is None
-            and not skip_pinned_check
-            and catalog.resolve() == OFFICIAL_CATALOG_PATH.resolve()
-        ):
-            expected_checksum = OFFICIAL_CATALOG_SHA256
-        self.catalog = Catalog(catalog, expected_sha256=expected_checksum)
+        uses_official_path = catalog.resolve() == OFFICIAL_CATALOG_PATH.resolve()
+        self.catalog, self.catalog_checksum_verified = self._load_catalog(
+            catalog, explicit_checksum, skip_pinned_check, uses_official_path,
+        )
         self.retriever = build_retriever(self.catalog, self.config)
         self.constraint_scorer = ConstraintScorer(self.catalog)
         self.dynamic_scorer = DynamicWeightScorer()
@@ -48,6 +45,33 @@ class Agent:
         self.policy = ClarificationPolicy(self.config)
         self._sessions: dict[str, SessionState] = {}
         self.exception_count = 0
+
+    @staticmethod
+    def _load_catalog(
+        path: Path,
+        explicit_checksum: str | None,
+        skip_pinned_check: bool,
+        uses_official_path: bool,
+    ) -> tuple[Catalog, bool | None]:
+        """Load the catalog, treating the pinned checksum as advisory.
+
+        An explicit ``SHOPLENS_CATALOG_SHA256`` is a hard gate. The implicit pin
+        on the official catalog path is only a reproducibility signal: a
+        differing grading catalog must still load rather than brick the agent,
+        so a checksum mismatch falls back to an unverified load. Returns the
+        catalog and whether its checksum was verified (``None`` when no pin
+        applied).
+        """
+        if explicit_checksum is not None:
+            return Catalog(path, expected_sha256=explicit_checksum), True
+        if skip_pinned_check or not uses_official_path:
+            return Catalog(path), None
+        try:
+            return Catalog(path, expected_sha256=OFFICIAL_CATALOG_SHA256), True
+        except ValueError as error:
+            if "checksum mismatch" not in str(error):
+                raise
+            return Catalog(path), False
 
     def reset(self, session_id: str, user_profile: dict) -> None:
         self._sessions[str(session_id)] = SessionState(

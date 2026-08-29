@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Iterator
 
@@ -28,12 +29,25 @@ def flatten_text(value: object) -> str:
     return " ".join(_pieces(value)).strip()
 
 
-def catalog_sha256(path: str | Path) -> str:
+@lru_cache(maxsize=64)
+def _sha256_for_signature(resolved: str, size: int, mtime_ns: int) -> str:
     digest = hashlib.sha256()
-    with Path(path).open("rb") as handle:
+    with open(resolved, "rb") as handle:
         for block in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
+
+
+def catalog_sha256(path: str | Path) -> str:
+    """SHA-256 of a catalog file, memoised on (path, size, mtime).
+
+    The same catalog is hashed by ``Catalog``, ``DenseRetriever`` and the eval
+    runner within one process; caching on the file signature collapses those
+    into a single read while still re-hashing whenever the file changes.
+    """
+    resolved = Path(path).resolve()
+    stat = resolved.stat()
+    return _sha256_for_signature(str(resolved), stat.st_size, stat.st_mtime_ns)
 
 
 @dataclass(frozen=True, slots=True)

@@ -6,6 +6,7 @@ import json
 import platform
 import resource
 import subprocess
+import sys
 import time
 from dataclasses import asdict
 from pathlib import Path
@@ -17,6 +18,15 @@ from src.contracts.config import get_run_config
 from src.eval.split import stratified_dev_holdout_split
 from src.retrieval import BM25Retriever, DenseRetriever, HybridRetriever
 from src.retrieval.dense import MODEL_REVISION
+
+
+def _peak_rss_kb() -> int:
+    """Peak resident set size in kilobytes, normalised across platforms.
+
+    ``ru_maxrss`` is reported in kilobytes on Linux but in bytes on macOS/BSD.
+    """
+    maxrss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    return maxrss // 1024 if sys.platform == "darwin" else maxrss
 
 
 def _git_sha() -> str:
@@ -163,8 +173,10 @@ def main() -> None:
     result = evaluate(agent, selected, catalog_ids, categories, products)
     elapsed_seconds = time.perf_counter() - started
     capability_status, reportability_reasons = _capability_status(agent)
-    if dirty is not False:
+    if dirty is True:
         reportability_reasons.insert(0, "Git tree is not clean")
+    elif dirty is None:
+        reportability_reasons.insert(0, "Git state could not be determined")
     reportable = not reportability_reasons
     record = {
         "config": config.name,
@@ -194,7 +206,7 @@ def main() -> None:
                 "status": _embedding_cache_status(agent),
             },
             "elapsed_seconds": round(elapsed_seconds, 6),
-            "peak_rss_kb": int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss),
+            "peak_rss_kb": _peak_rss_kb(),
         },
     }
     append_result(args.results_log, record)

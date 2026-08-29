@@ -73,7 +73,7 @@ def test_catalog_checksum_is_verified(catalog_path: Path) -> None:
         Catalog(catalog_path, expected_sha256="0" * 64)
 
 
-def test_default_catalog_path_uses_pinned_checksum(
+def test_default_catalog_path_pins_checksum_but_stays_advisory(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     data = tmp_path / "data"
@@ -81,6 +81,22 @@ def test_default_catalog_path_uses_pinned_checksum(
     path = data / "catalog.jsonl"
     path.write_text(json.dumps(ROWS[0]) + "\n", encoding="utf-8")
     monkeypatch.chdir(tmp_path)
+    # A grading catalog that differs from the pin must still load rather than
+    # brick construction; the mismatch is recorded, not raised.
+    agent = SubmissionAgent()
+    assert agent.catalog_checksum_verified is False
+    assert len(agent.catalog) == 1
+
+
+def test_explicit_checksum_override_is_a_hard_gate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    data = tmp_path / "data"
+    data.mkdir()
+    path = data / "catalog.jsonl"
+    path.write_text(json.dumps(ROWS[0]) + "\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("SHOPLENS_CATALOG_SHA256", "0" * 64)
     with pytest.raises(ValueError, match="checksum mismatch"):
         SubmissionAgent()
 

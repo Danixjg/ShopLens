@@ -4,6 +4,7 @@ import hashlib
 import os
 import time
 import zipfile
+from functools import lru_cache
 from pathlib import Path
 
 from src.catalog import Catalog, catalog_sha256
@@ -15,14 +16,30 @@ CACHE_SCHEMA_VERSION = 1
 
 
 def model_tree_sha256(path: str | Path) -> str:
-    """Hash model weights and runtime configuration using stable relative paths."""
+    """Hash model weights and runtime configuration using stable relative paths.
+
+    Memoised on the directory's per-file (relative path, size, mtime) signature
+    so repeated retriever constructions in one process avoid re-reading the
+    ~90 MB model tree, while any file change still forces a fresh hash.
+    """
     root = Path(path)
+    signature = tuple(
+        (file_path.relative_to(root).as_posix(), stat.st_size, stat.st_mtime_ns)
+        for file_path in sorted(item for item in root.rglob("*") if item.is_file())
+        for stat in (file_path.stat(),)
+    )
+    return _model_tree_digest(str(root), signature)
+
+
+@lru_cache(maxsize=8)
+def _model_tree_digest(root: str, signature: tuple[tuple[str, int, int], ...]) -> str:
+    root_path = Path(root)
     digest = hashlib.sha256()
-    for file_path in sorted(item for item in root.rglob("*") if item.is_file()):
-        relative = file_path.relative_to(root).as_posix().encode("utf-8")
-        digest.update(len(relative).to_bytes(4, "big"))
-        digest.update(relative)
-        with file_path.open("rb") as handle:
+    for relative, _size, _mtime in signature:
+        rel_bytes = relative.encode("utf-8")
+        digest.update(len(rel_bytes).to_bytes(4, "big"))
+        digest.update(rel_bytes)
+        with (root_path / relative).open("rb") as handle:
             for block in iter(lambda: handle.read(1024 * 1024), b""):
                 digest.update(block)
     return digest.hexdigest()

@@ -36,9 +36,9 @@ def apply_parsed_turn(state: SessionState, parsed: ParsedTurn, user_message: str
             for slot in state.slots:
                 if slot.active and not slot.hard and slot.source_turn == superseded_turn:
                     slot.active = False
-        replaced = set(parsed.hard_constraints) | set(parsed.soft_preferences)
-        for attribute in replaced:
-            _deactivate_attribute(state, attribute)
+        # The override's own constraints are retired and re-added by the shared
+        # constraints loop below; deactivating their buckets here as well would
+        # wipe later-disclosed slots the min-soft-turn retirement preserved.
     elif parsed.intent and (parsed.category is not None or state.turn_index == 1):
         state.intent = parsed.intent
 
