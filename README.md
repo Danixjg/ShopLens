@@ -127,10 +127,12 @@ sessions. A is the default when `SHOPLENS_CONFIG` is unset:
 python3 -m evaluator.local_evaluator
 ```
 
-After installing the dense dependencies, run the retained config P explicitly:
+After installing the dense dependencies, run the retained config P explicitly,
+or use config Q for the dev-selected bounded popularity experiment:
 
 ```bash
 SHOPLENS_CONFIG=P python3 -m evaluator.local_evaluator
+SHOPLENS_CONFIG=Q python3 -m evaluator.local_evaluator
 ```
 
 Run the stratified 120-session dev or 80-session holdout split and append the
@@ -197,17 +199,31 @@ hide override failures:
 
 ### Accuracy candidate validation
 
-The current implementation was frozen after dev-only tuning and then opened
-on holdout once. These isolated-snapshot rows are diagnostic—not yet canonical
-reportable evidence—because the implementation is still uncommitted. They used
-true hybrid retrieval, the pinned CPU model, matching vector digest, and zero
-agent/evaluator response exceptions. After the implementation commit, rerun
-the clean commands above before replacing the historical evidence table.
+Config P was frozen after dev-only tuning, opened on holdout once, and recorded
+as canonical reportable evidence in `results.jsonl`; Q remains dev-only. Q's row
+is diagnostic because its implementation is still uncommitted. Both used true
+hybrid retrieval and the pinned CPU model with zero agent/evaluator response
+exceptions. After the Q implementation commit, rerun the clean command before
+retaining Q or replacing P's evidence.
 
 | Config | Dev HR@10 | Dev MRR | Dev MTTC | Dev Score | Holdout HR@10 | Holdout MRR | Holdout MTTC | Holdout Score |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | F, new state/policy | 0.9417 | 0.5740 | 3.1333 | 0.8004 | — | — | — | — |
 | **P, phrase λ=0.15** | **0.9417** | **0.6392** | **3.1333** | **0.8199** | **0.9750** | **0.6449** | **2.8500** | **0.8440** |
+| Q, popularity λ=0.15 | 0.9417 | 0.7797 | 3.1333 | 0.8621 | — | — | — | — |
+
+Q was selected and evaluated on dev only; its public holdout metric remains
+unopened for this implementation. Against P it improved 50 target ranks,
+regressed none, and left 70 unchanged. HR@10 and MTTC were identical in every
+scenario. Dev MRR rose from P to Q for Boundary (`0.7417` → `0.8889`),
+Browsing (`0.6708` → `0.7760`), Buying (`0.6042` → `0.7948`), and Intent
+Override (`0.6144` → `0.7130`). These are dirty diagnostic results until Q is
+committed and reproduced by the clean evidence runner. Because the popularity
+hypothesis followed an aggregate review of target rating counts across all 200
+public sessions, Q's eventual holdout result must be labeled exploratory, not
+statistically untouched. A scenario-stratified paired bootstrap (10,000
+resamples, seed 2026) estimates Q's dev TechnicalScore gain over P at
+`0.042145`, with a 95% interval of `[0.030926, 0.054362]`.
 
 Weighting the frozen dev and holdout aggregates by their 120/80 sample counts
 gives an all-public estimate of HR@10 `0.955`, MRR `0.641488`, MTTC `3.02`,
@@ -243,7 +259,15 @@ uses baseline A. Hybrid configurations require the optional dense install.
 | G | Local cross-encoder reranker |
 | H | Optional LLM rank experiment; offline path remains available |
 | P | F plus membership-preserving phrase-rarity reranking |
+| Q | P plus a bounded rating-count prior inside the frozen Top-10 |
 | Z | Clarification off, diagnostic only |
+
+Q uses only the immutable organizer catalog. For each member of P's frozen
+Top-10 it log-scales `rating_number` against the catalog maximum and adds
+`0.15 * popularity / 61` to the existing P score. It then reorders those same
+identifiers deterministically. The prior cannot change HitRate@10 or MTTC; it
+is an ordering aid, never a retrieval filter or a replacement for
+disclosed-constraint evidence.
 
 The evaluator reports HR@10, MRR, MTTC, efficiency, the recommended composite,
 and the same metrics per scenario. Changes should be retained only after gains
@@ -256,7 +280,7 @@ provider. Neither is claimed as completed.
 
 ## Cost, latency, and network disclosure
 
-Configs A–G and P use zero prompt tokens, zero completion tokens, and no paid
+Configs A–G, P, and Q use zero prompt tokens, zero completion tokens, and no paid
 service, so their model cost is $0. They run fully offline after the catalog
 and selected local dependencies are present. Candidate values above remain
 explicitly diagnostic until regenerated from a clean commit.
@@ -271,6 +295,11 @@ explicitly diagnostic until regenerated from a clean commit.
   most once and otherwise selects a discriminative, non-declined facet.
 - Aggregate profiles contain limited independent signal; they are ingested but
   do not override explicit within-session preferences.
+- Q's rating-count prior favors established products and can disadvantage
+  niche or newly listed products. It is log-bounded, applies only after Top-10
+  membership is frozen, and never substitutes popularity for relevance.
+- Public target construction strongly favors products with many ratings, so
+  Q may overfit that benchmark prior even though its coefficient is dev-only.
 - Facet extraction is deliberately shallow and deterministic; it cannot infer
   every latent product attribute from sparse free-form metadata.
 - The dense model is vendored. The cross-encoder is not specified by the plan;

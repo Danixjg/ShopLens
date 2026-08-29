@@ -12,7 +12,7 @@ third-party media.
 4. Run the API walkthrough:
 
    ```bash
-   python3 scripts/demo_session.py --config P
+   python3 scripts/demo_session.py --config Q
    ```
 
    Point out ordered `parent_asin` values, `ask_attribute`, zero token usage,
@@ -20,7 +20,7 @@ third-party media.
 5. Run the clean reportable evaluator and display `results.jsonl`:
 
    ```bash
-   python3 -m src.eval.runner --config P --split holdout
+   python3 -m src.eval.runner --config Q --split holdout
    ```
 
    Explain HR@10, MRR, MTTC, per-scenario results, elapsed time, peak RSS,

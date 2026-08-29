@@ -16,6 +16,7 @@ from src.scoring import (
     DynamicWeightScorer,
     LocalCrossEncoderReranker,
     PhraseReranker,
+    PopularityReranker,
 )
 from src.state import apply_parsed_turn, build_retrieval_query
 
@@ -49,6 +50,11 @@ class Agent:
             else None
         )
         self.phrase_reranker = PhraseReranker(self.catalog) if self.config.phrase_rerank else None
+        self.popularity_reranker = (
+            PopularityReranker(self.catalog, self.config.popularity_rerank_weight)
+            if self.config.popularity_rerank
+            else None
+        )
         self.parser = TurnParser()
         self.policy = ClarificationPolicy(self.config, self.catalog)
         self._sessions: dict[str, SessionState] = {}
@@ -161,6 +167,8 @@ class Agent:
             candidates = self.reranker.rerank(query, candidates)
         if self.phrase_reranker is not None:
             candidates = self.phrase_reranker.rerank(state, candidates, pool)
+        if self.popularity_reranker is not None:
+            candidates = self.popularity_reranker.rerank(candidates)
 
         asins = [item.asin for item in candidates]
         if not asins:

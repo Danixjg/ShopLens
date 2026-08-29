@@ -423,6 +423,8 @@ dynamic_weights: bool
 reranker: "none" | "local_cross_encoder"
 llm_rank: bool          # default False
 phrase_rerank: bool     # default False; frozen Top-K membership only
+popularity_rerank: bool # default False; bounded catalog prior within frozen Top-K
+popularity_rerank_weight: float # Q records the dev-selected 0.15 coefficient
 ```
 
 **[CORRECTED] `clarification` is ON from config A.** Revision 1 measured it
@@ -440,6 +442,7 @@ misattributed E's gain to the wrong variable.
 | G | + reranker | MRR gain |
 | H | G + llm_rank | Only if wall-clock allows; needs offline fallback |
 | P | F + phrase_rerank | Contiguous disclosed-phrase ordering within frozen Top-K |
+| Q | P + popularity_rerank | Bounded rating-count prior within the same frozen Top-K |
 | Z | clarification off | **Diagnostic only.** Demonstrates the stall; never reported as a baseline |
 
 Note config A is **not** comparable to the published BM25 baseline — A asks

@@ -14,6 +14,9 @@ MRR_WEIGHT = 0.30
 EFFICIENCY_WEIGHT = 0.20
 MISS_TURN_VALUE = 11
 MAX_TURNS = 10
+# Selected once on the 120-session dev split. The public holdout is not used
+# to revise this value.
+POPULARITY_RERANK_WEIGHT = 0.15
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,6 +30,8 @@ class RunConfig:
     reranker: RerankerMode = "none"
     llm_rank: bool = False
     phrase_rerank: bool = False
+    popularity_rerank: bool = False
+    popularity_rerank_weight: float = 0.0
 
 
 _A = RunConfig()
@@ -40,6 +45,18 @@ CONFIGS: dict[str, RunConfig] = {
     "G": replace(_A, name="G", retrieval_mode="hybrid", constraint_scoring=True, session_memory=True, clarification="info_gain", dynamic_weights=True, reranker="local_cross_encoder"),
     "H": replace(_A, name="H", retrieval_mode="hybrid", constraint_scoring=True, session_memory=True, clarification="info_gain", dynamic_weights=True, reranker="local_cross_encoder", llm_rank=True),
     "P": replace(_A, name="P", retrieval_mode="hybrid", constraint_scoring=True, session_memory=True, clarification="info_gain", dynamic_weights=True, phrase_rerank=True),
+    "Q": replace(
+        _A,
+        name="Q",
+        retrieval_mode="hybrid",
+        constraint_scoring=True,
+        session_memory=True,
+        clarification="info_gain",
+        dynamic_weights=True,
+        phrase_rerank=True,
+        popularity_rerank=True,
+        popularity_rerank_weight=POPULARITY_RERANK_WEIGHT,
+    ),
     "Z": replace(_A, name="Z", clarification="off"),
 }
 
