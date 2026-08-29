@@ -2,6 +2,10 @@ __pycache__/
 *.py[cod]
 .DS_Store
 .env
+# Local dependency environments, including the optional uv path in README.
+.venv/
+.venv-dense/
+venv/
 results.json
 data/catalog.jsonl
 data/catalog.embeddings.npz
