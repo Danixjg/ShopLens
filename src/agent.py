@@ -17,6 +17,7 @@ from src.scoring import (
     LocalCrossEncoderReranker,
     PhraseReranker,
     PopularityReranker,
+    ProfileReranker,
 )
 from src.state import apply_parsed_turn, build_retrieval_query
 
@@ -53,6 +54,11 @@ class Agent:
         self.popularity_reranker = (
             PopularityReranker(self.catalog, self.config.popularity_rerank_weight)
             if self.config.popularity_rerank
+            else None
+        )
+        self.profile_reranker = (
+            ProfileReranker(self.catalog, self.config.profile_rerank_weight)
+            if self.config.profile_rerank
             else None
         )
         self.parser = TurnParser()
@@ -169,6 +175,10 @@ class Agent:
             candidates = self.phrase_reranker.rerank(state, candidates, pool)
         if self.popularity_reranker is not None:
             candidates = self.popularity_reranker.rerank(candidates)
+        # Last, and weakest: a stored profile is prior belief, so it only breaks
+        # ties the disclosed constraints and this session's evidence have left.
+        if self.profile_reranker is not None:
+            candidates = self.profile_reranker.rerank(state, candidates, pool)
 
         asins = [item.asin for item in candidates]
         if not asins:

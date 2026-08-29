@@ -17,6 +17,9 @@ MAX_TURNS = 10
 # Selected once on the 120-session dev split. The public holdout is not used
 # to revise this value.
 POPULARITY_RERANK_WEIGHT = 0.15
+# Provisional until a dev-split sweep over ALLOWED_PROFILE_WEIGHTS selects one.
+# Holdout is not used to revise this value.
+PROFILE_RERANK_WEIGHT = 0.05
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,6 +35,8 @@ class RunConfig:
     phrase_rerank: bool = False
     popularity_rerank: bool = False
     popularity_rerank_weight: float = 0.0
+    profile_rerank: bool = False
+    profile_rerank_weight: float = 0.0
 
 
 _A = RunConfig()
@@ -56,6 +61,20 @@ CONFIGS: dict[str, RunConfig] = {
         phrase_rerank=True,
         popularity_rerank=True,
         popularity_rerank_weight=POPULARITY_RERANK_WEIGHT,
+    ),
+    "R": replace(
+        _A,
+        name="R",
+        retrieval_mode="hybrid",
+        constraint_scoring=True,
+        session_memory=True,
+        clarification="info_gain",
+        dynamic_weights=True,
+        phrase_rerank=True,
+        popularity_rerank=True,
+        popularity_rerank_weight=POPULARITY_RERANK_WEIGHT,
+        profile_rerank=True,
+        profile_rerank_weight=PROFILE_RERANK_WEIGHT,
     ),
     "Z": replace(_A, name="Z", clarification="off"),
 }
