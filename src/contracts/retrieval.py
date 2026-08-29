@@ -3,12 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Protocol
 
+from .parsing import ConstraintPairs
+
 
 @dataclass(frozen=True, slots=True)
 class RetrievalQuery:
     text: str
-    hard: dict[str, str] = field(default_factory=dict)
-    soft: dict[str, str] = field(default_factory=dict)
+    hard: ConstraintPairs = ()
+    soft: ConstraintPairs = ()
     category: str | None = None
     turn_index: int = 1
 

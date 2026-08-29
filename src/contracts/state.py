@@ -46,5 +46,6 @@ class SessionState:
     history: list[tuple[str, str]] = field(default_factory=list)
     asked_attributes: list[AskAttribute] = field(default_factory=list)
     declined_attributes: set[str] = field(default_factory=set)
+    last_declined: str | None = None
     last_recommendations: list[str] = field(default_factory=list)
     user_profile: UserProfile | None = None

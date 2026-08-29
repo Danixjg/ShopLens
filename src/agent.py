@@ -10,7 +10,7 @@ from src.contracts.retrieval import Candidate, RetrievalQuery
 from src.contracts.state import SessionState, UserProfile
 from src.parsing import TurnParser
 from src.policy import ClarificationPolicy
-from src.retrieval import HybridRetriever, build_retriever
+from src.retrieval import BM25Retriever, HybridRetriever, build_retriever
 from src.scoring import ConstraintScorer, DynamicWeightScorer, LocalCrossEncoderReranker
 from src.state import apply_parsed_turn, build_retrieval_query
 
@@ -42,7 +42,7 @@ class Agent:
             else None
         )
         self.parser = TurnParser()
-        self.policy = ClarificationPolicy(self.config)
+        self.policy = ClarificationPolicy(self.config, self.catalog)
         self._sessions: dict[str, SessionState] = {}
         self.exception_count = 0
 
@@ -93,6 +93,15 @@ class Agent:
             return self.retriever.search_for_intent(query, k, state.intent)
         return self.retriever.search(query, k)
 
+    def _phrase_bonus(
+        self, candidates: list[Candidate], query: RetrievalQuery,
+    ) -> list[Candidate]:
+        """Apply lexical phrase evidence when a BM25 index backs the retriever."""
+        lexical = self.retriever.lexical if isinstance(self.retriever, HybridRetriever) else self.retriever
+        if isinstance(lexical, BM25Retriever):
+            return lexical.add_phrase_bonus(candidates, query)
+        return candidates
+
     def _respond(self, session_id: str, user_message: str, turn: int, top_k: int) -> dict:
         state = self._state_for(session_id)
         safe_turn = max(1, min(10, int(turn)))
@@ -119,12 +128,17 @@ class Agent:
             candidates = self.constraint_scorer.score(candidates, query)
         if self.config.dynamic_weights:
             candidates = self.dynamic_scorer.score(candidates, state.intent)
-        over_general = self.policy.is_over_general(candidates, safe_k)
+        # The pre-truncation pool drives clarification: it measures how many
+        # products still satisfy the disclosed constraints, not how many fit in
+        # one response.
+        pool = candidates
+        over_general = self.policy.is_over_general(pool, safe_k)
         # Reranking may improve reciprocal rank but must not change Top-K
         # membership and therefore Hit Rate@10.
         candidates = sorted(candidates, key=lambda item: (-item.score, item.asin))[:safe_k]
         if self.reranker is not None:
             candidates = self.reranker.rerank(query, candidates)
+        candidates = self._phrase_bonus(candidates, query)
         candidates = sorted(candidates, key=lambda item: (-item.score, item.asin))[:safe_k]
 
         asins = [item.asin for item in candidates]
@@ -133,7 +147,7 @@ class Agent:
         if asins:
             state.last_recommendations = list(asins)
 
-        ask_attribute = self.policy.choose(state, candidates)
+        ask_attribute = self.policy.choose(state, pool)
         if ask_attribute is not None and ask_attribute not in state.asked_attributes:
             state.asked_attributes.append(ask_attribute)
         return AgentReply(

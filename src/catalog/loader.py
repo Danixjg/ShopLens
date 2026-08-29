@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from functools import lru_cache
 from pathlib import Path
 from typing import Iterator
 
@@ -29,25 +28,19 @@ def flatten_text(value: object) -> str:
     return " ".join(_pieces(value)).strip()
 
 
-@lru_cache(maxsize=64)
-def _sha256_for_signature(resolved: str, size: int, mtime_ns: int) -> str:
+def catalog_sha256(path: str | Path) -> str:
+    """Return the SHA-256 of the bytes that are currently on disk.
+
+    A cryptographic identity must never be inferred from mutable filesystem
+    metadata.  Callers that need to reuse a digest should retain the digest on
+    the immutable object built from those bytes instead of caching by path,
+    size, or modification time.
+    """
     digest = hashlib.sha256()
-    with open(resolved, "rb") as handle:
+    with Path(path).resolve().open("rb") as handle:
         for block in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
-
-
-def catalog_sha256(path: str | Path) -> str:
-    """SHA-256 of a catalog file, memoised on (path, size, mtime).
-
-    The same catalog is hashed by ``Catalog``, ``DenseRetriever`` and the eval
-    runner within one process; caching on the file signature collapses those
-    into a single read while still re-hashing whenever the file changes.
-    """
-    resolved = Path(path).resolve()
-    stat = resolved.stat()
-    return _sha256_for_signature(str(resolved), stat.st_size, stat.st_mtime_ns)
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,17 +70,21 @@ class Catalog:
     """Immutable in-memory view of the organizer's JSONL catalog."""
 
     def __init__(self, path: str | Path, expected_sha256: str | None = None) -> None:
-        self.path = Path(path)
-        if expected_sha256 is not None:
-            actual = catalog_sha256(self.path)
-            if actual.lower() != expected_sha256.strip().lower():
-                raise ValueError(f"catalog checksum mismatch: expected {expected_sha256}, got {actual}")
+        self.path = Path(path).resolve()
         products: list[Product] = []
         seen: set[str] = set()
-        with self.path.open(encoding="utf-8") as handle:
-            for line_number, line in enumerate(handle, start=1):
-                if not line.strip():
+        digest = hashlib.sha256()
+        # Hash the exact byte stream being parsed.  This avoids a check/use race
+        # between a separate checksum pass and catalog construction.
+        with self.path.open("rb") as handle:
+            for line_number, raw_line in enumerate(handle, start=1):
+                digest.update(raw_line)
+                if not raw_line.strip():
                     continue
+                try:
+                    line = raw_line.decode("utf-8")
+                except UnicodeDecodeError as exc:
+                    raise ValueError(f"invalid UTF-8 on catalog line {line_number}") from exc
                 raw = json.loads(line)
                 asin = str(raw.get("parent_asin", "")).strip()
                 if not asin:
@@ -110,8 +107,12 @@ class Catalog:
                     rating_number=int(raw_count) if isinstance(raw_count, (int, float)) else 0,
                     store=flatten_text(raw.get("store")),
                 ))
+        actual = digest.hexdigest()
+        if expected_sha256 is not None and actual.lower() != expected_sha256.strip().lower():
+            raise ValueError(f"catalog checksum mismatch: expected {expected_sha256}, got {actual}")
         if not products:
             raise ValueError("catalog is empty")
+        self.sha256 = actual
         self._products = tuple(products)
         self._by_asin = {item.parent_asin: item for item in products}
 

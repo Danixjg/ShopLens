@@ -5,6 +5,7 @@ from unittest.mock import patch
 from src.agent import Agent
 from src.contracts.config import RunConfig
 from src.contracts.retrieval import Candidate, RetrievalQuery
+from src.retrieval.bm25 import BM25Retriever
 from src.retrieval.hybrid import build_retriever
 from src.scoring.constraints import ConstraintScorer
 
@@ -24,8 +25,8 @@ def test_constraint_scoring_preserves_expected_components() -> None:
     scorer = ConstraintScorer(_Catalog())
     query = RetrievalQuery(
         text="running shoe",
-        hard={"material": "cotton", "color": "red"},
-        soft={"feature": "waterproof breathable"},
+        hard=(("material", "cotton"), ("color", "red")),
+        soft=(("feature", "waterproof breathable"),),
         turn_index=2,
     )
 
@@ -34,11 +35,28 @@ def test_constraint_scoring_preserves_expected_components() -> None:
     assert len(result) == 1
     assert result[0].components == {
         "bm25": 5.0,
-        "hard_material": 1.5,
-        "hard_color": -2.0,
-        "soft_feature": 0.46,
+        "hard_material_0": 1.5,
+        "hard_color_1": -2.0,
+        "soft_feature_0": 0.46,
     }
     assert result[0].score == 4.96
+
+
+def test_phrase_bonus_is_capped_below_the_hard_constraint_penalty() -> None:
+    retriever = object.__new__(BM25Retriever)
+    retriever.phrase_evidence = lambda _query: {
+        "A": [(f"phrase_soft_feature_{index}", 1.0) for index in range(4)],
+    }
+    candidates = [
+        Candidate("A", -4.0, {"hard_material_0": -4.0}),
+        Candidate("B", 1.5, {"hard_material_0": 1.5}),
+    ]
+
+    result = BM25Retriever.add_phrase_bonus(retriever, candidates, RetrievalQuery(""))
+
+    assert {candidate.asin for candidate in result} == {"A", "B"}
+    assert next(item for item in result if item.asin == "A").score == -3.0
+    assert result[0].asin == "B"
 
 
 def test_disabled_reranker_is_not_constructed() -> None:

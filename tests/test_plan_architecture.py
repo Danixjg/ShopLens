@@ -136,13 +136,13 @@ def test_parser_recognizes_buying_template() -> None:
     parsed = TurnParser().parse("I'm looking for Shoes. A key requirement is: leather.", 1)
     assert parsed.intent == "buying"
     assert parsed.category == "Shoes"
-    assert parsed.hard_constraints == {"material": "leather"}
+    assert parsed.hard_constraints == (("material", "leather"),)
 
 
 def test_parser_recognizes_override() -> None:
     parsed = TurnParser().parse(f"{OVERRIDE_MARKER} brown.", 3)
     assert parsed.is_override
-    assert parsed.hard_constraints == {"feature": "brown"}
+    assert parsed.hard_constraints == (("feature", "brown"),)
 
 
 def test_parser_routes_override_scenario_on_first_message() -> None:
@@ -156,7 +156,7 @@ def test_parser_recognizes_boundary_signal_only() -> None:
     ordinary = parser.parse("I don't have an additional preference for feature.", 2)
     assert boundary.declined_attribute == "feature"
     assert ordinary.declined_attribute is None
-    assert boundary.soft_preferences == {}
+    assert boundary.soft_preferences == ()
 
 
 def test_runner_rejects_unavailable_requested_capability(catalog_path: Path) -> None:
@@ -241,6 +241,20 @@ def test_override_keeps_later_disclosed_constraints() -> None:
     assert "leather" in query.text
 
 
+def test_override_promotes_a_value_already_volunteered_as_a_preference() -> None:
+    parser = TurnParser()
+    state = SessionState()
+    apply_parsed_turn(state, parser.parse("I'm looking for Boots. old style", 1), "initial", 1)
+    apply_parsed_turn(
+        state, parser.parse("For that, what matters is: leather; waterproof.", 2), "disclosed", 2,
+    )
+    apply_parsed_turn(state, parser.parse(f"{OVERRIDE_MARKER} leather.", 3), "override", 3)
+    query = build_retrieval_query(state)
+    assert ("material", "leather") in query.hard
+    assert ("material", "leather") not in query.soft
+    assert ("feature", "waterproof") in query.soft
+
+
 def test_override_does_not_erase_later_constraint_in_same_bucket() -> None:
     parser = TurnParser()
     state = SessionState()
@@ -266,7 +280,7 @@ def test_category_change_clears_soft_but_preserves_hard() -> None:
     apply_parsed_turn(state, changed, "changed", 2)
     query = build_retrieval_query(state)
     assert query.category == "Jackets"
-    assert query.hard == {"material": "leather"}
+    assert query.hard == (("material", "leather"),)
     assert "black" not in query.text
 
 
@@ -275,12 +289,12 @@ def test_query_builder_passes_hard_constraint_without_filtering() -> None:
     state = SessionState()
     parsed = parser.parse("I'm looking for Boots. A key requirement is: leather.", 1)
     apply_parsed_turn(state, parsed, "message", 1)
-    assert build_retrieval_query(state).hard == {"material": "leather"}
+    assert build_retrieval_query(state).hard == (("material", "leather"),)
 
 
 def test_constraint_scorer_penalizes_but_keeps_mismatch(catalog_path: Path) -> None:
     scorer = ConstraintScorer(Catalog(catalog_path))
-    query = RetrievalQuery("boots leather", hard={"material": "leather"})
+    query = RetrievalQuery("boots leather", hard=(("material", "leather"),))
     result = scorer.score([Candidate("A", 0.0), Candidate("B", 0.0)], query)
     assert {item.asin for item in result} == {"A", "B"}
     assert result[0].asin == "A"
@@ -288,42 +302,98 @@ def test_constraint_scorer_penalizes_but_keeps_mismatch(catalog_path: Path) -> N
 
 def test_constraint_scorer_ignores_evaluator_attribute_label(catalog_path: Path) -> None:
     scorer = ConstraintScorer(Catalog(catalog_path))
-    query = RetrievalQuery("black", hard={"color": "color: black"})
+    query = RetrievalQuery("black", hard=(("color", "color: black"),))
     result = scorer.score([Candidate("A", 0.0)], query)
-    assert result[0].components["hard_color"] == 1.5
+    assert result[0].components["hard_color_0"] == 1.5
 
 
 def test_material_penalty_is_stronger_than_color(catalog_path: Path) -> None:
     scorer = ConstraintScorer(Catalog(catalog_path))
-    material = scorer.score([Candidate("B", 0.0)], RetrievalQuery("leather", hard={"material": "leather"}))[0]
-    color = scorer.score([Candidate("B", 0.0)], RetrievalQuery("blue", hard={"color": "blue"}))[0]
+    material = scorer.score([Candidate("B", 0.0)], RetrievalQuery("leather", hard=(("material", "leather"),)))[0]
+    color = scorer.score([Candidate("B", 0.0)], RetrievalQuery("blue", hard=(("color", "blue"),)))[0]
     assert material.score < color.score
 
 
 def test_dynamic_route_emphasizes_hard_components_for_buying() -> None:
-    candidate = Candidate("A", 1.0, {"hard_material": 2.0, "soft_style": 1.0})
+    candidate = Candidate("A", 1.0, {"hard_material_0": 2.0, "soft_style_0": 1.0})
     scorer = DynamicWeightScorer()
     buying = scorer.score([candidate], "buying")[0]
     browsing = scorer.score([candidate], "browsing")[0]
     assert buying.score > browsing.score
 
 
-def test_boundary_policy_stops_asking() -> None:
+def test_boundary_policy_excludes_only_the_declined_attribute() -> None:
     state = SessionState(declined_attributes={"feature"})
-    assert ClarificationPolicy(CONFIGS["E"]).choose(state, []) is None
+    assert ClarificationPolicy(CONFIGS["E"]).choose(state, []) == "other"
 
 
-def test_clarification_uses_measured_priority() -> None:
-    state = SessionState()
+def test_open_question_defers_one_turn_after_being_waved_off() -> None:
     policy = ClarificationPolicy(CONFIGS["E"])
+    refused = SessionState(declined_attributes={"other"}, last_declined="other")
+    assert policy.choose(refused, []) == "feature"
+
+
+def test_open_question_returns_once_the_refusal_turn_has_passed() -> None:
+    policy = ClarificationPolicy(CONFIGS["E"])
+    later = SessionState(declined_attributes={"other"}, last_declined=None)
+    assert policy.choose(later, []) == "other"
+
+
+def test_fixed_clarification_retains_measured_priority() -> None:
+    state = SessionState()
+    policy = ClarificationPolicy(CONFIGS["A"])
     assert policy.choose(state, []) == "feature"
     state.asked_attributes.extend(["feature", "material"])
     assert policy.choose(state, []) == "color"
 
 
-def test_clarification_uses_other_only_once() -> None:
-    state = SessionState(asked_attributes=["feature", "material", "color"])
+def test_information_policy_asks_openly_without_a_discriminating_facet() -> None:
     policy = ClarificationPolicy(CONFIGS["E"])
+    assert policy.choose(SessionState(), []) == "other"
+
+
+def test_information_policy_skips_facets_already_covered_by_a_slot() -> None:
+    parser = TurnParser()
+    state = SessionState()
+    apply_parsed_turn(
+        state, parser.parse("I'm looking for Boots. A key requirement is: leather.", 1), "m", 1,
+    )
+    assert "material" in ClarificationPolicy._covered(state)
+
+
+def test_same_attribute_disclosures_accumulate_instead_of_replacing() -> None:
+    parser = TurnParser()
+    state = SessionState()
+    parsed = parser.parse(
+        "For that, what matters is: waterproof construction; removable footbed.", 2,
+    )
+    assert len(parsed.soft_preferences) == 2
+    apply_parsed_turn(state, parsed, "disclosed", 2)
+    query = build_retrieval_query(state)
+    assert "waterproof construction" in query.text
+    assert "removable footbed" in query.text
+    assert len(query.soft) == 2
+
+
+def test_repeated_identical_disclosure_does_not_duplicate_a_slot() -> None:
+    parser = TurnParser()
+    state = SessionState()
+    for turn in (2, 3):
+        apply_parsed_turn(
+            state, parser.parse("For that, what matters is: waterproof.", turn), "d", turn,
+        )
+    assert len([slot for slot in state.slots if slot.active]) == 1
+
+
+def test_open_question_repeats_because_each_ask_discloses_more() -> None:
+    state = SessionState(asked_attributes=["feature", "material", "color", "other"])
+    policy = ClarificationPolicy(CONFIGS["E"])
+    assert policy.choose(state, []) == "other"
+
+
+def test_fixed_clarification_uses_other_only_once() -> None:
+    state = SessionState(asked_attributes=["feature", "material", "color"])
+    policy = ClarificationPolicy(CONFIGS["A"])
     assert policy.choose(state, []) == "other"
     state.asked_attributes.append("other")
     assert policy.choose(state, []) is None
@@ -340,8 +410,8 @@ def test_over_generality_changes_guidance_without_suppressing_recommendations() 
 
 def test_parser_classifier_matches_evaluator_bucket_rules() -> None:
     parser = TurnParser()
-    assert parser.parse("brown", 1).soft_preferences == {"feature": "brown"}
-    assert parser.parse("suede", 1).soft_preferences == {"feature": "suede"}
+    assert parser.parse("brown", 1).soft_preferences == (("feature", "brown"),)
+    assert parser.parse("suede", 1).soft_preferences == (("feature", "suede"),)
 
 
 def test_turn_ten_never_returns_empty(catalog_path: Path) -> None:

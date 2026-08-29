@@ -7,8 +7,8 @@ from src.contracts.state import SessionState
 def build_retrieval_query(state: SessionState) -> RetrievalQuery:
     """Build the frozen state/retrieval seam from active slots only."""
     active = [slot for slot in state.slots if slot.active]
-    hard = {slot.attribute: slot.value for slot in active if slot.hard}
-    soft = {slot.attribute: slot.value for slot in active if not slot.hard}
+    hard = tuple((slot.attribute, slot.value) for slot in active if slot.hard)
+    soft = tuple((slot.attribute, slot.value) for slot in active if not slot.hard)
     parts: list[str] = []
     if state.category:
         parts.append(state.category)

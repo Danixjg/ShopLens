@@ -57,8 +57,8 @@ class TurnParser:
             intent = "intent_override"
         else:
             intent = "browsing"
-        hard: dict[str, str] = {}
-        soft: dict[str, str] = {}
+        hard: list[tuple[str, str]] = []
+        soft: list[tuple[str, str]] = []
         is_override = OVERRIDE_MARKER in message
         declined: str | None = None
 
@@ -82,20 +82,20 @@ class TurnParser:
         elif category is not None and ". " in message:
             free_text = message.split(". ", 1)[1].strip(" .")
             if free_text:
-                soft[classify_attribute(free_text)] = free_text
+                soft.append((classify_attribute(free_text), free_text))
         elif message and declined is None:
             # Accept ordinary customer language as a soft retrieval preference.
-            soft[classify_attribute(message)] = message
+            soft.append((classify_attribute(message), message))
 
         for value in values:
             target = hard if is_override or _BUYING_MARKER in message else soft
-            target[classify_attribute(value)] = value
+            target.append((classify_attribute(value), value))
 
         return ParsedTurn(
             intent=intent,
             category=category,
-            hard_constraints=hard,
-            soft_preferences=soft,
+            hard_constraints=tuple(hard),
+            soft_preferences=tuple(soft),
             requested_action=None,
             is_override=is_override,
             declined_attribute=declined,
