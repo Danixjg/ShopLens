@@ -1,0 +1,3 @@
+# Config A uses only the Python 3.10+ standard library.
+# Dense and cross-encoder experiments additionally require numpy and
+# sentence-transformers; install the pinned requirements-dense.txt file.

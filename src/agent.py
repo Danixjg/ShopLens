@@ -1,0 +1,173 @@
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+from src.catalog import OFFICIAL_CATALOG_PATH, OFFICIAL_CATALOG_SHA256, Catalog
+from src.contracts.config import RunConfig, get_run_config
+from src.contracts.response import AgentReply, Recommendation, Usage
+from src.contracts.retrieval import Candidate, RetrievalQuery
+from src.contracts.state import SessionState, UserProfile
+from src.parsing import TurnParser
+from src.policy import ClarificationPolicy
+from src.retrieval import BM25Retriever, HybridRetriever, build_retriever
+from src.scoring import ConstraintScorer, DynamicWeightScorer, LocalCrossEncoderReranker
+from src.state import apply_parsed_turn, build_retrieval_query
+
+
+class Agent:
+    """Offline, stateful ShopLens implementation of the organizer contract."""
+
+    def __init__(
+        self,
+        catalog_path: str | Path = "data/catalog.jsonl",
+        config: RunConfig | str | None = None,
+    ) -> None:
+        self.config = config if isinstance(config, RunConfig) else get_run_config(config)
+        explicit_checksum = os.getenv("SHOPLENS_CATALOG_SHA256") or None
+        skip_pinned_check = os.getenv("SHOPLENS_SKIP_CATALOG_VERIFY", "").lower() in {
+            "1", "true", "yes",
+        }
+        catalog = Path(catalog_path)
+        uses_official_path = catalog.resolve() == OFFICIAL_CATALOG_PATH.resolve()
+        self.catalog, self.catalog_checksum_verified = self._load_catalog(
+            catalog, explicit_checksum, skip_pinned_check, uses_official_path,
+        )
+        self.retriever = build_retriever(self.catalog, self.config)
+        self.constraint_scorer = ConstraintScorer(self.catalog)
+        self.dynamic_scorer = DynamicWeightScorer()
+        self.reranker = (
+            LocalCrossEncoderReranker(self.catalog)
+            if self.config.reranker == "local_cross_encoder"
+            else None
+        )
+        self.parser = TurnParser()
+        self.policy = ClarificationPolicy(self.config, self.catalog)
+        self._sessions: dict[str, SessionState] = {}
+        self.exception_count = 0
+
+    @staticmethod
+    def _load_catalog(
+        path: Path,
+        explicit_checksum: str | None,
+        skip_pinned_check: bool,
+        uses_official_path: bool,
+    ) -> tuple[Catalog, bool | None]:
+        """Load the catalog, treating the pinned checksum as advisory.
+
+        An explicit ``SHOPLENS_CATALOG_SHA256`` is a hard gate. The implicit pin
+        on the official catalog path is only a reproducibility signal: a
+        differing grading catalog must still load rather than brick the agent,
+        so a checksum mismatch falls back to an unverified load. Returns the
+        catalog and whether its checksum was verified (``None`` when no pin
+        applied).
+        """
+        if explicit_checksum is not None:
+            return Catalog(path, expected_sha256=explicit_checksum), True
+        if skip_pinned_check or not uses_official_path:
+            return Catalog(path), None
+        try:
+            return Catalog(path, expected_sha256=OFFICIAL_CATALOG_SHA256), True
+        except ValueError as error:
+            if "checksum mismatch" not in str(error):
+                raise
+            return Catalog(path), False
+
+    def reset(self, session_id: str, user_profile: dict) -> None:
+        self._sessions[str(session_id)] = SessionState(
+            user_profile=UserProfile.from_dict(user_profile if isinstance(user_profile, dict) else {})
+        )
+
+    def _state_for(self, session_id: str) -> SessionState:
+        return self._sessions.setdefault(str(session_id), SessionState())
+
+    def _fallback_asins(self, state: SessionState, k: int) -> list[str]:
+        if state.last_recommendations:
+            return state.last_recommendations[:k]
+        return self.catalog.fallback_asins[:k]
+
+    def _search(
+        self, state: SessionState, query: RetrievalQuery, k: int,
+    ) -> list[Candidate]:
+        if self.config.dynamic_weights and isinstance(self.retriever, HybridRetriever):
+            return self.retriever.search_for_intent(query, k, state.intent)
+        return self.retriever.search(query, k)
+
+    def _phrase_bonus(
+        self, candidates: list[Candidate], query: RetrievalQuery,
+    ) -> list[Candidate]:
+        """Apply lexical phrase evidence when a BM25 index backs the retriever."""
+        lexical = self.retriever.lexical if isinstance(self.retriever, HybridRetriever) else self.retriever
+        if isinstance(lexical, BM25Retriever):
+            return lexical.add_phrase_bonus(candidates, query)
+        return candidates
+
+    def _respond(self, session_id: str, user_message: str, turn: int, top_k: int) -> dict:
+        state = self._state_for(session_id)
+        safe_turn = max(1, min(10, int(turn)))
+        safe_k = max(1, min(10, int(top_k)))
+        parsed = self.parser.parse(str(user_message), safe_turn)
+        if not self.config.session_memory:
+            for slot in state.slots:
+                slot.active = False
+        apply_parsed_turn(state, parsed, str(user_message), safe_turn)
+        query = build_retrieval_query(state)
+
+        depth = max(50, safe_k * 10) if self.config.constraint_scoring else safe_k
+        candidates = self._search(state, query, depth)
+        if not candidates and query.category and query.text != query.category:
+            # Relax disclosed constraints before falling back to a prior/global
+            # list. Hard constraints remain available to penalty scoring below.
+            relaxed = RetrievalQuery(
+                text=query.category,
+                category=query.category,
+                turn_index=query.turn_index,
+            )
+            candidates = self._search(state, relaxed, depth)
+        if self.config.constraint_scoring:
+            candidates = self.constraint_scorer.score(candidates, query)
+        if self.config.dynamic_weights:
+            candidates = self.dynamic_scorer.score(candidates, state.intent)
+        # The pre-truncation pool drives clarification: it measures how many
+        # products still satisfy the disclosed constraints, not how many fit in
+        # one response.
+        pool = candidates
+        over_general = self.policy.is_over_general(pool, safe_k)
+        # Reranking may improve reciprocal rank but must not change Top-K
+        # membership and therefore Hit Rate@10.
+        candidates = sorted(candidates, key=lambda item: (-item.score, item.asin))[:safe_k]
+        if self.reranker is not None:
+            candidates = self.reranker.rerank(query, candidates)
+        candidates = self._phrase_bonus(candidates, query)
+        candidates = sorted(candidates, key=lambda item: (-item.score, item.asin))[:safe_k]
+
+        asins = [item.asin for item in candidates]
+        if not asins:
+            asins = self._fallback_asins(state, safe_k)
+        if asins:
+            state.last_recommendations = list(asins)
+
+        ask_attribute = self.policy.choose(state, pool)
+        if ask_attribute is not None and ask_attribute not in state.asked_attributes:
+            state.asked_attributes.append(ask_attribute)
+        return AgentReply(
+            message=self.policy.message(ask_attribute, over_general),
+            ask_attribute=ask_attribute,
+            recommendations=[Recommendation(parent_asin=asin) for asin in asins],
+            usage=Usage(),
+        ).to_dict()
+
+    def respond(self, session_id: str, user_message: str, turn: int, top_k: int) -> dict:
+        try:
+            return self._respond(session_id, user_message, turn, top_k)
+        except Exception:
+            self.exception_count += 1
+            state = self._state_for(session_id)
+            safe_k = max(1, min(10, top_k if isinstance(top_k, int) else 10))
+            asins = self._fallback_asins(state, safe_k)
+            return AgentReply(
+                message="Here are reliable catalog options while I refine the search.",
+                ask_attribute=None if self.config.clarification == "off" else "other",
+                recommendations=[Recommendation(parent_asin=asin) for asin in asins],
+                usage=Usage(),
+            ).to_dict()
