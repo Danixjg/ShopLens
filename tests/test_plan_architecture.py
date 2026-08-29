@@ -14,7 +14,12 @@ from src.contracts.config import CONFIGS, get_run_config
 from src.contracts.response import AgentReply, Recommendation, Usage
 from src.contracts.retrieval import Candidate, RetrievalQuery
 from src.contracts.state import SessionState
-from src.eval.runner import _capability_status
+from src.eval.runner import (
+    REFERENCE_REQUIREMENTS,
+    _capability_status,
+    _lock_entries,
+    _locked_environment_snapshot,
+)
 from src.eval.split import stratified_dev_holdout_split
 from src.parsing import OVERRIDE_MARKER, TurnParser
 from src.policy import ClarificationPolicy
@@ -473,3 +478,34 @@ def test_stratified_split_is_120_80_with_fixed_scenario_counts() -> None:
 def test_split_is_deterministic() -> None:
     samples = [{"sample_id": str(i), "scenario_type": "buying"} for i in range(20)]
     assert stratified_dev_holdout_split(samples) == stratified_dev_holdout_split(samples)
+
+
+def test_lock_entries_join_hash_continuations_and_drop_comments() -> None:
+    text = (
+        "# header\n"
+        "alpha==1.0 \\\n"
+        f"    --hash=sha256:{'0' * 64} \\\n"
+        f"    --hash=sha256:{'1' * 64}\n"
+        "    # via beta\n"
+        "beta==2.0 \\\n"
+        f"    --hash=sha256:{'2' * 64}\n"
+    )
+    entries = _lock_entries(text)
+    assert len(entries) == 2
+    assert entries[0].startswith("alpha==1.0 --hash=sha256:")
+    assert entries[0].count("--hash=") == 2
+    assert entries[1] == f"beta==2.0 --hash=sha256:{'2' * 64}"
+
+
+def test_version_only_lock_entry_is_rejected_as_not_hash_pinned(tmp_path: Path) -> None:
+    path = tmp_path / "plain.txt"
+    path.write_text("numpy==2.5.2\n", encoding="utf-8")
+    _digest, mismatches = _locked_environment_snapshot(path)
+    assert mismatches == ["numpy: lock entry is not hash-pinned"]
+
+
+def test_reference_lock_is_hash_pinned_and_matches_environment() -> None:
+    pytest.importorskip("torch")
+    digest, mismatches = _locked_environment_snapshot(REFERENCE_REQUIREMENTS)
+    assert digest is not None
+    assert mismatches == []
