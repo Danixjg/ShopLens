@@ -3,43 +3,23 @@ from __future__ import annotations
 from collections import Counter
 from math import log2
 
-from src.catalog import Catalog, Product
+from src.attributes import normalize_ascii
+from src.catalog import Catalog
 from src.contracts.config import RunConfig
 from src.contracts.response import AskAttribute
 from src.contracts.retrieval import Candidate
 from src.contracts.state import SessionState
-from src.retrieval.text import terms
 
 
 CLARIFICATION_SEQUENCE: tuple[AskAttribute, ...] = ("feature", "material", "color")
-
-# A targeted facet is only worth a turn when it splits the viable pool almost
-# perfectly. Binary split entropy is capped at 1.0, so this threshold keeps the
-# structured question for the case where it genuinely halves the pool and
-# otherwise asks openly, which surfaces any undisclosed constraint instead of
-# one bucket's worth.
-OPEN_QUESTION_GAIN = 0.9
-MIN_FACET_SUPPORT = 0.05
-POOL_SAMPLE_LIMIT = 60
-
-_FACET_VALUES: dict[str, frozenset[str]] = {
-    "material": frozenset(
-        ("cotton", "polyester", "nylon", "leather", "wool", "spandex", "silk", "rayon", "fabric")
-    ),
-    "color": frozenset(
-        ("black", "white", "blue", "red", "pink", "green", "brown", "gray",
-         "grey", "purple", "yellow", "orange")
-    ),
-}
-_STRUCTURED_VALUES = frozenset().union(*_FACET_VALUES.values())
 
 
 def _satisfies_hard_constraints(candidate: Candidate) -> bool:
     """True when no disclosed hard constraint penalised this candidate.
 
-    ``ConstraintScorer`` records a negative ``hard_<attribute>_<n>`` component
-    for every violated hard constraint. Candidates without hard components
-    (configs that skip constraint scoring) are treated as viable.
+    ``ConstraintScorer`` records one bounded negative ``hard_<attribute>``
+    component for a violated attribute group. Candidates without hard
+    components (configs that skip constraint scoring) are treated as viable.
     """
     return all(
         value >= 0
@@ -48,31 +28,21 @@ def _satisfies_hard_constraints(candidate: Candidate) -> bool:
     )
 
 
-def _facet_values(product: Product, attribute: str) -> set[str]:
-    if attribute == "feature":
-        return set(terms(product.features)) - _STRUCTURED_VALUES
-    return set(terms(product.searchable_text)) & _FACET_VALUES.get(attribute, frozenset())
+def _information_gain(buckets: list[tuple[str, ...]]) -> float:
+    """Normalized expected entropy reduction for a multiclass facet.
 
-
-def _information_gain(attribute: str, products: list[Product]) -> float:
-    """Entropy of the best binary split this attribute induces on the pool."""
-    size = len(products)
+    A missing facet is intentionally uninformative: rather than treating
+    ``missing`` as a revealing answer bucket, it leaves the posterior at N.
+    """
+    size = len(buckets)
     if size < 2:
         return 0.0
-    counts: Counter[str] = Counter()
-    for product in products:
-        counts.update(_facet_values(product, attribute))
-    support = max(1, round(size * MIN_FACET_SUPPORT))
-    best = 0.0
-    for count in counts.values():
-        if not support <= count <= size - support:
-            continue
-        probability = count / size
-        best = max(
-            best,
-            -probability * log2(probability) - (1.0 - probability) * log2(1.0 - probability),
-        )
-    return best
+    prior = log2(size)
+    counts = Counter(bucket for bucket in buckets if bucket)
+    empty_count = sum(1 for bucket in buckets if not bucket)
+    posterior = (empty_count / size) * prior
+    posterior += sum((count / size) * log2(count) for count in counts.values())
+    return max(0.0, (prior - posterior) / prior)
 
 
 class ClarificationPolicy:
@@ -82,91 +52,116 @@ class ClarificationPolicy:
 
     @staticmethod
     def _covered(state: SessionState) -> set[str]:
-        """Attributes the shopper has already spoken to on an active slot.
-
-        Re-asking a covered bucket spends a turn to be told there is no further
-        preference, so coverage disqualifies a facet from the targeted branch.
-        """
+        """Attributes the shopper has already spoken to on an active slot."""
         return {slot.attribute for slot in state.slots if slot.active}
 
     @staticmethod
-    def _just_declined(state: SessionState, attribute: str) -> bool:
-        """True when the shopper waved this exact attribute off on the last turn.
+    def _active_values(state: SessionState, attribute: str) -> set[str]:
+        active: set[str] = set()
+        for slot in state.slots:
+            if not slot.active or slot.attribute != attribute:
+                continue
+            label, separator, remainder = slot.value.partition(":")
+            value = (
+                remainder
+                if separator and label.strip().casefold().replace(" ", "_") == attribute
+                else slot.value
+            )
+            active.add(normalize_ascii(value))
+        return active
 
-        A refusal means "use your judgment here", not a standing veto: the
-        shopper answers the following question normally. Deferring by a single
-        turn respects the refusal without going silent, which would forfeit
-        every remaining turn of a hard 10-turn budget.
-        """
-        return state.last_declined == attribute
-
-    def _viable_products(self, candidates: list[Candidate]) -> list[Product]:
+    def _pool(self, candidates: list[Candidate]) -> list[Candidate]:
+        """Prefer hard-constraint matches, retaining the full pool as fallback."""
         if self.catalog is None:
             return []
-        products: list[Product] = []
-        for candidate in candidates:
-            if not _satisfies_hard_constraints(candidate):
-                continue
-            product = self.catalog.get(candidate.asin)
-            if product is not None:
-                products.append(product)
-            if len(products) >= POOL_SAMPLE_LIMIT:
-                break
-        return products
+        full = [candidate for candidate in candidates if self.catalog.get(candidate.asin) is not None]
+        viable = [candidate for candidate in full if _satisfies_hard_constraints(candidate)]
+        return viable if len(viable) >= 2 else full
+
+    def _gain(
+        self, state: SessionState, attribute: str, candidates: list[Candidate],
+    ) -> float:
+        if self.catalog is None:
+            return 0.0
+        active = self._active_values(state, attribute)
+        buckets = [
+            tuple(value for value in self.catalog.facet_values(candidate.asin, attribute) if value not in active)
+            for candidate in candidates
+        ]
+        return _information_gain(buckets)
 
     def _fixed_choice(self, state: SessionState) -> AskAttribute | None:
         for attribute in CLARIFICATION_SEQUENCE:
             if attribute not in state.asked_attributes and attribute not in state.declined_attributes:
                 return attribute
-        return "other" if "other" not in state.asked_attributes else None
+        return (
+            "other"
+            if "other" not in state.asked_attributes and "other" not in state.declined_attributes
+            else None
+        )
 
     def _information_choice(
-        self, state: SessionState, candidates: list[Candidate],
+        self, state: SessionState, candidates: list[Candidate], over_general: bool,
     ) -> AskAttribute | None:
-        covered = self._covered(state)
         unasked = [
             attribute for attribute in CLARIFICATION_SEQUENCE
             if attribute not in state.asked_attributes
             and attribute not in state.declined_attributes
-            and attribute not in covered
         ]
-        if unasked:
-            products = self._viable_products(candidates)
+        if over_general and unasked:
+            pool = self._pool(candidates)
             gain, _, attribute = max(
-                (_information_gain(name, products), -index, name)
+                (self._gain(state, name, pool), -index, name)
                 for index, name in enumerate(unasked)
             )
-            if gain >= OPEN_QUESTION_GAIN:
+            if gain > 0.0:
                 return attribute
-        if not self._just_declined(state, "other"):
+        if not over_general and unasked:
+            return unasked[0]
+        if (
+            "other" not in state.asked_attributes
+            and "other" not in state.declined_attributes
+        ):
             return "other"
-        # The open question was just waved off, so spend this turn on the most
-        # promising targeted facet instead of falling silent.
-        return unasked[0] if unasked else None
+        # Once the open question is spent, an over-general pool still benefits
+        # from the deterministic next eligible targeted facet.
+        return unasked[0] if over_general and unasked else None
 
-    def choose(self, state: SessionState, candidates: list[Candidate]) -> AskAttribute | None:
+    def choose(
+        self, state: SessionState, candidates: list[Candidate], over_general: bool = True,
+    ) -> AskAttribute | None:
         if self.config.clarification == "off":
             return None
         # A refusal retires only that attribute; the shopper answers normally
         # afterwards, so the policy must keep asking about everything else.
         if self.config.clarification == "info_gain":
-            return self._information_choice(state, candidates)
+            return self._information_choice(state, candidates, over_general)
         return self._fixed_choice(state)
 
     @staticmethod
     def is_over_general(candidates: list[Candidate], recommendation_limit: int) -> bool:
-        """Detect more constraint-satisfying matches than the response can expose.
+        """Detect a crowded relevance boundary rather than raw over-fetch depth.
 
-        The candidate pool passed here is the pre-truncation retrieval depth,
-        which is deliberately over-fetched for constraint scoring. Counting the
-        raw pool would flag over-generality on nearly every turn, so we count
-        only viable matches -- candidates that satisfy every disclosed hard
-        constraint (no negative ``hard_*`` scoring component).
+        Hard-constraint violations are excluded first.  Among the remaining
+        candidates, the response boundary is ambiguous when its score gap is no
+        sharper than the pool's mean adjacent gap.  This turns off after a real
+        constraint-induced separation and avoids defining the agent's chosen
+        retrieval depth as customer ambiguity.
         """
         if recommendation_limit <= 0:
             return False
-        viable = sum(1 for candidate in candidates if _satisfies_hard_constraints(candidate))
-        return viable > recommendation_limit
+        scores = sorted(
+            (candidate.score for candidate in candidates if _satisfies_hard_constraints(candidate)),
+            reverse=True,
+        )
+        if len(scores) <= recommendation_limit:
+            return False
+        span = scores[0] - scores[-1]
+        if span <= 0.0:
+            return True
+        mean_gap = span / (len(scores) - 1)
+        boundary_gap = max(0.0, scores[recommendation_limit - 1] - scores[recommendation_limit])
+        return boundary_gap <= mean_gap + 1e-12
 
     @staticmethod
     def message(attribute: AskAttribute | None, over_general: bool = False) -> str:

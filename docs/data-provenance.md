@@ -15,10 +15,13 @@ rows              50000
 
 At runtime, the Agent automatically verifies these decompressed bytes whenever
 the official default path is used. `SHOPLENS_CATALOG_SHA256` enables the same
-check for a custom path. Loading fails on a checksum mismatch, a missing
+check for a custom path; the official path has no bypass. Loading fails on a checksum mismatch, a missing
 identifier, or a duplicate identifier. The loader exposes immutable product
 records and the system never writes to the catalog.
 
 The released public set contains 200 labeled development sessions. The local
 ablation runner creates its deterministic stratified 120/80 split without
-editing that source file.
+editing that source file. Reportable runs pin its SHA-256 to
+`857259f7a438e6188ac63e18995b6ff4489bfcfc4a716a798b9a2aa0ee8f7579`,
+evaluate private immutable input snapshots, and rebuild dense vectors from the
+verified vendored model in-process.

@@ -19,13 +19,13 @@ Buying-versus-Browsing routing rather than destructive filters.
 - Buying uses a lexical-weighted union with the hybrid pool for precision
   without sacrificing recoverable recall.
 - Browsing and Intent Override use in-memory BM25 plus local dense retrieval.
-- Active session slots form the retrieval query; overrides retire the original
-  preference while preserving useful later disclosures.
-- Hard constraints apply penalties and bonuses but never delete products.
-- Candidate-pool overload changes the guidance message while recommendations
-  still ship on the same turn.
-- Clarification follows the measured `feature -> material -> color -> other`
-  order, uses the wildcard once, and then stops probing.
+- Active multi-value slots form the retrieval query; overrides retire only
+  superseded soft evidence while preserving independent disclosures.
+- Hard constraints apply bounded per-attribute evidence, never filters.
+- Candidate-pool overload selects the facet with the highest normalized
+  multiclass information gain, excluding declined attributes.
+- A local contiguous-phrase rarity bonus reranks only the frozen Top 10, so it
+  can improve MRR without changing Hit Rate membership.
 
 ## Tools, libraries, APIs, and cost
 
@@ -45,27 +45,32 @@ and model provenance. Full attribution is in `DATA_ATTRIBUTION.md`.
 
 ## Evaluation
 
-Clean commit `be4017aa` produced the reportable A–F matrix in `results.jsonl`.
-The retained F route scored `0.712658` on the 120-session stratified dev split
-(HR@10 `0.841667`, MRR `0.502748`, MTTC `3.95`) and `0.719476` on the
-80-session holdout (HR@10 `0.85`, MRR `0.515754`, MTTC `4.0125`). The runner
-confirmed effective hybrid retrieval, a cache hit, zero agent exceptions, zero
-tokens, and $0 API cost. Its dev/holdout scenario HR@10 values were Boundary
-`0.166667/0.25`, Browsing `0.895833/0.875`, Buying `0.9375/0.875`, and Intent
-Override `0.666667/0.916667`.
+Clean commit `be4017aa` remains the canonical reportable baseline: F scored
+`0.712658` on the 120-session dev split and `0.719476` on the 80-session
+holdout. The accuracy candidate was then frozen after dev-only tuning and
+opened on holdout once. In isolated true-hybrid validation, config P scored
+`0.819939` on dev (HR@10 `0.941667`, MRR `0.639239`, MTTC `3.133333`) and
+`0.843958` on holdout (HR@10 `0.975`, MRR `0.644861`, MTTC `2.85`). The
+120/80 weighted public estimate is `0.829546`.
 
-For comparison, C scored `0.689519/0.707318` on dev/holdout, and the
-dependency-free A baseline scored `0.616107/0.629293`. Disabling session memory
-in D regressed both splits. E tied C exactly because the frozen candidate seam
-lacks the attributes required for disagreement-based information gain. The
-200-session diagnostic Z run without clarification scored `0.192606` with
-MTTC `8.895`, quantifying the simulator's disclosure stall. G and H are not
-claimed because no plan-specified offline cross-encoder or LLM provider exists.
+The phrase stage alone improved 24 dev sessions and regressed none while
+preserving HR/MTTC. A paired, scenario-stratified 10,000-resample bootstrap
+(seed 2026) put its TechnicalScore gain at `0.019567`, with a 95% interval of
+`[0.010258, 0.029980]`.
+
+Those P rows are explicitly diagnostic until regenerated from a clean
+implementation commit. They used the pinned CPU model and identical catalog,
+dataset, model, cache, and embedding-content digests, with zero agent or
+evaluator response exceptions and $0 API cost. Boundary HR@10 moved from the
+historical F `0.166667/0.25` to candidate P `1.0/0.75` on dev/holdout; Buying,
+Browsing, and Intent Override also improved or held in aggregate. Configs G
+and H are not claimed because no plan-specified offline cross-encoder or LLM
+provider exists.
 
 ## Limitations and future work
 
-- Boundary sessions remain difficult because the shopper may decline the only
-  asked attribute and reveal no new target evidence.
+- Boundary remains the smallest and noisiest scenario bucket (six dev and four
+  holdout sessions), so its rank metrics are directional rather than stable.
 - The deterministic parser is tailored to controlled simulator language, not
   arbitrary noisy commerce conversations.
 - Sparse catalog metadata makes some constraints, especially color, unreliable.

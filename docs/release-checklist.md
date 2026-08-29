@@ -14,13 +14,13 @@
 ## Reproduction and evidence
 
 - [ ] A clean install reproduces config A without optional dependencies.
-- [ ] Dense requirements reproduce explicit configs B–H fully offline.
-- [x] Reportable dev and holdout runs exist for retained configurations.
-- [x] Canonical `be4017aa` rows record a clean Git SHA and `reportable: true`.
-- [x] Canonical results include config flags, effective capabilities, guarded
+- [ ] The locked dense environment reproduces configs B–H and P fully offline.
+- [ ] Clean reportable dev and holdout runs exist for retained config P.
+- [x] Historical canonical `be4017aa` rows record a clean Git SHA and `reportable: true`.
+- [ ] New canonical results include config flags, effective capabilities, guarded
       exception count, dependency/model versions, catalog/dataset digests,
-      cache state, elapsed time, and peak RSS.
-- [x] README metrics are generated from those durable records only.
+      model/vector provenance, cache state, elapsed time, and peak RSS.
+- [ ] README candidate metrics are replaced or confirmed by durable clean-commit records.
 
 ## Required external deliverables
 

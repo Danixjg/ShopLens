@@ -1,14 +1,19 @@
 from __future__ import annotations
 
+import re
+
 from src.contracts.parsing import ParsedTurn
 from src.contracts.state import SessionState, Slot
+
+
+def _identity(attribute: str, value: str) -> tuple[str, str]:
+    return attribute.strip().casefold(), re.sub(r"\s+", " ", value).strip().casefold()
 
 
 def apply_parsed_turn(state: SessionState, parsed: ParsedTurn, user_message: str, turn: int) -> None:
     """Apply one parsed customer turn, preserving the slot-erasure invariants."""
     state.turn_index = max(1, int(turn))
     state.history.append(("user", str(user_message)))
-    state.last_declined = parsed.declined_attribute
     if parsed.declined_attribute:
         state.declined_attributes.add(parsed.declined_attribute)
 
@@ -33,26 +38,41 @@ def apply_parsed_turn(state: SessionState, parsed: ParsedTurn, user_message: str
     elif parsed.intent and (parsed.category is not None or state.turn_index == 1):
         state.intent = parsed.intent
 
-    known = {(slot.attribute, slot.value, slot.hard) for slot in state.slots if slot.active}
     for hard, constraints in ((True, parsed.hard_constraints), (False, parsed.soft_preferences)):
         for attribute, value in constraints:
             # Same-attribute disclosures accumulate: the simulator discloses up
             # to two constraints per turn and most classify into one bucket, so
             # replacing by attribute would discard the discriminative evidence
             # the turn was spent acquiring. Only an override erases a slot.
-            if (attribute, value, hard) in known:
+            clean_attribute = str(attribute).strip().casefold()
+            clean_value = str(value).strip()
+            if not clean_attribute or not clean_value:
                 continue
-            if hard:
-                # A value already volunteered as a preference can be restated as
-                # a requirement. Promote it rather than dropping the hard slot,
-                # which would forfeit hard scoring and the override route.
-                for slot in state.slots:
-                    if slot.active and not slot.hard and (slot.attribute, slot.value) == (attribute, value):
-                        slot.active = False
-            known.add((attribute, value, hard))
+            state.declined_attributes.discard(clean_attribute)
+            identity = _identity(clean_attribute, clean_value)
+            matches = [
+                slot for slot in state.slots
+                if slot.active and _identity(slot.attribute, slot.value) == identity
+            ]
+            if matches:
+                # Collapse any historical duplicate slots onto the earliest
+                # source while preserving the strongest (hard) interpretation.
+                slot = min(matches, key=lambda item: (item.source_turn, item.updated_at))
+                for duplicate in matches:
+                    if duplicate is not slot:
+                        duplicate.active = False
+                if hard and not slot.hard:
+                    slot.hard = True
+                    slot.confidence = 1.0
+                elif not hard and slot.hard:
+                    slot.confidence = max(slot.confidence, 1.0)
+                else:
+                    slot.confidence = max(slot.confidence, 1.0 if hard else 0.75)
+                slot.updated_at = state.turn_index
+                continue
             state.slots.append(Slot(
-                attribute=attribute,
-                value=value,
+                attribute=clean_attribute,
+                value=clean_value,
                 hard=hard,
                 source_turn=state.turn_index,
                 confidence=1.0 if hard else 0.75,

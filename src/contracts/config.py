@@ -26,6 +26,7 @@ class RunConfig:
     dynamic_weights: bool = False
     reranker: RerankerMode = "none"
     llm_rank: bool = False
+    phrase_rerank: bool = False
 
 
 _A = RunConfig()
@@ -38,6 +39,7 @@ CONFIGS: dict[str, RunConfig] = {
     "F": replace(_A, name="F", retrieval_mode="hybrid", constraint_scoring=True, session_memory=True, clarification="info_gain", dynamic_weights=True),
     "G": replace(_A, name="G", retrieval_mode="hybrid", constraint_scoring=True, session_memory=True, clarification="info_gain", dynamic_weights=True, reranker="local_cross_encoder"),
     "H": replace(_A, name="H", retrieval_mode="hybrid", constraint_scoring=True, session_memory=True, clarification="info_gain", dynamic_weights=True, reranker="local_cross_encoder", llm_rank=True),
+    "P": replace(_A, name="P", retrieval_mode="hybrid", constraint_scoring=True, session_memory=True, clarification="info_gain", dynamic_weights=True, phrase_rerank=True),
     "Z": replace(_A, name="Z", clarification="off"),
 }
 

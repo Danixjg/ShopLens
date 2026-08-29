@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 
+from src.attributes import classify_attribute
 from src.contracts.parsing import ParsedTurn
 
 
@@ -9,28 +10,12 @@ OVERRIDE_MARKER = "Actually, ignore my earlier preference. What I need is:"
 _BUYING_MARKER = ". A key requirement is:"
 _EXPLORE_MARKER = ", but I'm still exploring."
 _DISCLOSURE_MARKER = "For that, what matters is:"
-_DECLINE_RE = re.compile(r"I don't have a preference for ([a-z_]+)", re.I)
-_MATERIAL_RE = re.compile(r"\b(cotton|polyester|nylon|leather|wool|spandex|silk|rayon|fabric)\b", re.I)
-_COLOR_RE = re.compile(r"\b(black|white|blue|red|pink|green)\b", re.I)
-
-
-def classify_attribute(value: str) -> str:
-    lowered = value.lower()
-    if "budget" in lowered or re.search(r"(?:\$|<=|under)\s*\d", lowered):
-        return "budget"
-    if _MATERIAL_RE.search(lowered):
-        return "material"
-    if "color" in lowered or _COLOR_RE.search(lowered):
-        return "color"
-    if any(word in lowered for word in ("size", "sizing", "width", "wide", "narrow")):
-        return "size"
-    if any(word in lowered for word in ("department", "style", "fit", "sleeve", "neck")):
-        return "style"
-    if any(word in lowered for word in ("hiking", "running", "gym", "winter", "outdoor", "work")):
-        return "use_case"
-    return "feature"
-
-
+_DECLINE_RE = re.compile(
+    r"I don't have (?:a|an additional) preference for ([a-z_]+)", re.I,
+)
+_CONTROL_MESSAGES = frozenset({
+    "Those options are not quite right yet. Ask me about one specific attribute.",
+})
 def _category_from_initial(message: str) -> str | None:
     prefix = "I'm looking for "
     if not message.startswith(prefix):
@@ -83,7 +68,7 @@ class TurnParser:
             free_text = message.split(". ", 1)[1].strip(" .")
             if free_text:
                 soft.append((classify_attribute(free_text), free_text))
-        elif message and declined is None:
+        elif message and declined is None and message not in _CONTROL_MESSAGES:
             # Accept ordinary customer language as a soft retrieval preference.
             soft.append((classify_attribute(message), message))
 
