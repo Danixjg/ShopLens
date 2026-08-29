@@ -9,19 +9,41 @@ third-party media.
    turn; silence stalls; overrides require slot erasure.
 3. Show the architecture diagram in `README.md` and explain the Buying versus
    Browsing route, recoverable constraint scoring, and offline model.
-4. Run the API walkthrough:
+4. Run the API walkthrough. Use the interpreter that has
+   `requirements-dense.lock.txt` installed — below it is `.venv-dense/bin/python`,
+   matching the README setup. Either invocation works:
 
    ```bash
-   python3 scripts/demo_session.py --config P
+   .venv-dense/bin/python scripts/demo_session.py --config P
+   .venv-dense/bin/python -m scripts.demo_session --config P
    ```
 
-   Point out ordered `parent_asin` values, `ask_attribute`, zero token usage,
-   accumulated requirements, and the turn-three override.
-5. Run the clean reportable evaluator and display `results.jsonl`:
+   A stock `python3` without the dense dependencies is **not** usable for
+   recording. Hybrid retrieval degrades to BM25 silently at the library level,
+   so the demo would show BM25 results while the narration says hybrid. The
+   script refuses rather than letting that happen, and exits non-zero:
+
+   ```
+   config P requests hybrid retrieval but this interpreter provides bm25.
+   ```
+
+   If that message appears, stop and fix the environment; do not record around
+   it.
+
+   Each turn prints the customer line, the agent reply, the attribute asked,
+   and the ranked Top 10 as `rank. title  parent_asin`, so a viewer can judge
+   whether the ranking is good instead of reading opaque identifiers. Point out
+   the accumulated requirements, the turn-three override retiring the earlier
+   preference, and the zero token usage printed at the end.
+5. Run the clean reportable evaluator and display `results.jsonl`, using the
+   same interpreter:
 
    ```bash
-   python3 -m src.eval.runner --config P --split holdout
+   .venv-dense/bin/python -m src.eval.runner --config P --split holdout
    ```
+
+   This run must be made from a clean tree; the runner refuses to append
+   non-reportable evidence to the canonical log.
 
    Explain HR@10, MRR, MTTC, per-scenario results, elapsed time, peak RSS,
    effective retriever, in-process vector provenance, catalog/dataset digests,
