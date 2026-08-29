@@ -4,6 +4,7 @@ __pycache__/
 .env
 results.json
 data/catalog.jsonl
+data/catalog.embeddings.npz
 data/releases/
 # Organizer-only code, private evaluation data, manifests, and build reports.
 organizer/
