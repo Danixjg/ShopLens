@@ -15,7 +15,7 @@ call a paid API, or require network access during baseline scoring.
 ```text
 customer message
       |
-deterministic parser ----> session slots / override erasure
+deterministic parser ----> multi-value slots / override erasure
                                   |
                          retrieval query seam
                                   |
@@ -23,11 +23,13 @@ deterministic parser ----> session slots / override erasure
                  \          /
              reciprocal-rank fusion
                        |
-        recoverable constraint penalties
+     bounded per-attribute constraint scoring
                        |
-          optional local cross-encoder
+             freeze Top-K membership
                        |
-       clarification + guarded API response
+       optional phrase-rarity reranking
+                       |
+ information-gain clarification + guarded response
 ```
 
 The implementation is split by responsibility:
@@ -36,15 +38,18 @@ The implementation is split by responsibility:
 - `src/catalog/`: immutable JSONL loading, normalization, and checksum verification.
 - `src/parsing/` and `src/state/`: controlled-language parsing, slot transitions, and query construction.
 - `src/retrieval/`: weighted FTS5 BM25, optional local dense retrieval, and reciprocal-rank fusion.
-- `src/scoring/`: non-filtering hard-constraint penalties, soft preference decay, dynamic routes, and optional local reranking.
-- `src/policy/`: measured clarification order: `feature`, `material`, `color`, then `other`.
+- `src/scoring/`: bounded non-filtering constraint evidence, dynamic routes,
+  and membership-preserving phrase-rarity reranking.
+- `src/policy/`: candidate-facet information gain with targeted fallback and
+  persistent per-attribute decline handling.
 - `src/agent.py`: integration and last-non-empty/global failure recovery.
 - `agent.py` and `starter/agent.py`: thin shims for submission and the organizer's local evaluator.
 
 Hard constraints are penalties, never filters. A parsing mistake can lower a
 candidate but cannot delete the target from the retrieval pool. Query text is
-built from active slots only, so an override such as “black, then actually
-brown” does not retain `black`.
+built from active slots only. Same-attribute disclosures accumulate, while a
+genuine override such as “black, then actually brown” retires superseded soft
+evidence without erasing unrelated constraints.
 
 ## Requirements and setup
 
@@ -65,10 +70,17 @@ python3 -m pip install -r requirements-dev.txt
 python3 -m pytest -q
 ```
 
-Install the pinned optional dependencies before running B–H:
+Install the portable optional dependencies before running hybrid configs:
 
 ```bash
 python3 -m pip install -r requirements-dense.txt
+```
+
+Reportable dense evidence uses the fully resolved reference environment on
+CPython 3.12, Linux x86-64:
+
+```bash
+python3 -m pip install -r requirements-dense.lock.txt
 ```
 
 The default `data/catalog.jsonl` path automatically verifies the pinned
@@ -79,15 +91,19 @@ load-time protection by setting its digest:
 export SHOPLENS_CATALOG_SHA256="$(sha256sum data/catalog.jsonl | cut -d' ' -f1)"
 ```
 
-`SHOPLENS_SKIP_CATALOG_VERIFY=1` is an explicit diagnostic escape hatch for a
-fixture placed at the default path; never use it for reportable scoring.
+The default and repository-absolute catalog paths always enforce the official
+digest. For fixture diagnostics, pass a custom path and its explicit checksum;
+there is no verification bypass for the official path.
 
 The repository deliberately loads dense and reranker models by local path,
 never by model name. The embedding model is pinned and documented in
-`models/README.md`. Dense catalog embeddings are computed once and persisted
-as ignored file `data/catalog.embeddings.npz`. If local model files or optional
-packages are unavailable, hybrid mode falls back to deterministic BM25 rather
-than making a network request or returning an empty response.
+`models/README.md`. Dense catalog embeddings are computed locally and may be
+persisted as the ignored file `data/catalog.embeddings.npz`. Normal agent use
+can reuse a validated cache. A reportable run instead rebuilds vectors from
+the pinned model and an immutable catalog snapshot in-process. If local model
+files or optional packages are unavailable, normal hybrid use falls back to
+deterministic BM25 without a network request; the evidence runner marks that
+capability mismatch non-reportable.
 
 ## Reproduce evaluation
 
@@ -98,18 +114,26 @@ sessions. A is the default when `SHOPLENS_CONFIG` is unset:
 python3 -m evaluator.local_evaluator
 ```
 
-After installing `requirements-dense.txt`, select hybrid config C explicitly:
+After installing the dense dependencies, run the retained config P explicitly:
 
 ```bash
-SHOPLENS_CONFIG=C python3 -m evaluator.local_evaluator
+SHOPLENS_CONFIG=P python3 -m evaluator.local_evaluator
 ```
 
 Run the stratified 120-session dev or 80-session holdout split and append the
 config, scores, split, and Git SHA to `results.jsonl`:
 
 ```bash
-python3 -m src.eval.runner --config A --split dev
-python3 -m src.eval.runner --config A --split holdout
+python3 -m src.eval.runner --config P --split dev
+python3 -m src.eval.runner --config P --split holdout
+```
+
+The canonical runner requires a clean tree and writes only reportable evidence
+to `results.jsonl`. Dirty diagnostics must use a path outside the repository:
+
+```bash
+python3 -m src.eval.runner --config P --split dev \
+  --allow-dirty --results-log /tmp/shoplens-p-dev.jsonl
 ```
 
 The public organizer starter (which does not ask clarification questions)
@@ -121,10 +145,11 @@ Reportable results are generated by `src.eval.runner` only from an identifiable
 clean implementation whose requested local capabilities actually loaded and
 whose guarded response fallback handled no unexpected exceptions. The runner
 records those capability checks and fallback count alongside config flags,
-dependency/model versions, catalog digest, cache state, latency, memory, and
-Git state. Dev and holdout use the deterministic stratified 120/80 split.
+locked dependencies, platform, pinned model and vector digests, catalog and
+dataset digests, cache provenance, latency, memory, and four Git-state gates.
+Dev and holdout use the deterministic stratified 120/80 split.
 
-### Measured results
+### Historical reportable baseline
 
 The following rows come from clean commit `be4017aa` in `results.jsonl`.
 All A–F rows report zero guarded exceptions; B–F confirm that hybrid retrieval
@@ -140,11 +165,10 @@ better; lower MTTC is better.
 | E | 0.8250 | 0.4567 | 4.0000 | 0.6895 | 0.8375 | 0.5027 | 4.1125 | 0.7073 |
 | **F** | **0.8417** | **0.5027** | **3.9500** | **0.7127** | **0.8500** | **0.5158** | **4.0125** | **0.7195** |
 
-F is the retained dense configuration: its dynamic Buying route improves C
-on dev and holdout. D shows that removing session memory regresses both; E's
-exact tie with C confirms that the frozen `Candidate` seam cannot supply the
-attribute values needed for the planned disagreement-based policy. B also
-shows that dense fusion alone is not sufficient. Config Z, the diagnostic
+F was the retained dense configuration at that commit. D shows that removing
+session memory regressed both; E's historical tie with C predates the live
+facet-based information-gain policy. B also shows that dense fusion alone is
+not sufficient. Config Z, the diagnostic
 no-clarification run over all 200 sessions, scores only `0.192606` with MTTC
 `8.895`, demonstrating the cost of stalled disclosure.
 
@@ -158,6 +182,38 @@ hide override failures:
 | Buying | 0.9375 | 0.5937 | 2.8125 | 0.8750 | 0.4288 | 3.2500 |
 | Intent Override | 0.6667 | 0.3836 | 6.3333 | 0.9167 | 0.5980 | 4.7500 |
 
+### Accuracy candidate validation
+
+The current implementation was frozen after dev-only tuning and then opened
+on holdout once. These isolated-snapshot rows are diagnostic—not yet canonical
+reportable evidence—because the implementation is still uncommitted. They used
+true hybrid retrieval, the pinned CPU model, matching vector digest, and zero
+agent/evaluator response exceptions. After the implementation commit, rerun
+the clean commands above before replacing the historical evidence table.
+
+| Config | Dev HR@10 | Dev MRR | Dev MTTC | Dev Score | Holdout HR@10 | Holdout MRR | Holdout MTTC | Holdout Score |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| F, new state/policy | 0.9417 | 0.5740 | 3.1333 | 0.8004 | — | — | — | — |
+| **P, phrase λ=0.15** | **0.9417** | **0.6392** | **3.1333** | **0.8199** | **0.9750** | **0.6449** | **2.8500** | **0.8440** |
+
+Weighting the frozen dev and holdout aggregates by their 120/80 sample counts
+gives an all-public estimate of HR@10 `0.955`, MRR `0.641488`, MTTC `3.02`,
+and TechnicalScore `0.829546`, without rerunning or retuning on holdout.
+
+| Scenario | Dev HR@10 | Dev MRR | Dev MTTC | Holdout HR@10 | Holdout MRR | Holdout MTTC |
+|---|---:|---:|---:|---:|---:|---:|
+| Boundary | 1.0000 | 0.7417 | 4.1667 | 0.7500 | 0.1708 | 4.5000 |
+| Browsing | 0.9792 | 0.6708 | 2.6458 | 1.0000 | 0.8001 | 2.6875 |
+| Buying | 0.9167 | 0.6042 | 2.8958 | 1.0000 | 0.5501 | 2.1875 |
+| Intent Override | 0.8889 | 0.6144 | 4.7222 | 0.9167 | 0.6417 | 4.5000 |
+
+On dev, paired P-versus-F evaluation improved the target rank in 24 sessions
+and regressed none, with identical HR/MTTC. A scenario-stratified paired
+bootstrap (10,000 resamples, seed 2026) estimates the score gain at `0.019567`
+with a 95% interval of `[0.010258, 0.029980]`.
+Separate warm dev processes measured peak RSS of `1,527,340` KB for F and
+`1,527,920` KB for P, a `580` KB increase.
+
 ## Ablation configurations
 
 Select an ablation with `SHOPLENS_CONFIG`. An unset or unknown value safely
@@ -169,32 +225,28 @@ uses baseline A. Hybrid configurations require the optional dense install.
 | B | Hybrid retrieval |
 | C | Constraint scoring and session memory |
 | D | C with session memory disabled |
-| E | Information-prior clarification; measured tie with C because the candidate seam lacks attribute values |
+| E | Candidate-facet information-gain clarification |
 | F | Dynamic buying/browsing weights |
 | G | Local cross-encoder reranker |
 | H | Optional LLM rank experiment; offline path remains available |
+| P | F plus membership-preserving phrase-rarity reranking |
 | Z | Clarification off, diagnostic only |
 
 The evaluator reports HR@10, MRR, MTTC, efficiency, the recommended composite,
 and the same metrics per scenario. Changes should be retained only after gains
 on both dev and holdout without a severe scenario regression.
 
-The frozen `Candidate` contract does not expose candidate attribute values, so
-candidate-disagreement information gain cannot be implemented through the
-planned seam. E currently follows the same measured global attribute prior as
-the other clarification-on runs and is reported as a measured no-op rather
-than an improvement. G likewise requires a specific
-vendored cross-encoder that the plan does not name; H remains conditional on a
-wall-clock run and a specified provider. Neither is claimed as completed.
+The policy reads immutable catalog facets for the live candidate pool without
+expanding the frozen `Candidate` contract. G still requires a specific vendored
+cross-encoder that the plan does not name; H remains conditional on a specified
+provider. Neither is claimed as completed.
 
 ## Cost, latency, and network disclosure
 
-Configs A–G use zero prompt tokens, zero completion tokens, and no paid
+Configs A–G and P use zero prompt tokens, zero completion tokens, and no paid
 service, so their model cost is $0. They run fully offline after the catalog
-and any selected local model dependencies are present. Benchmark values are
-reported from the durable `results.jsonl` evidence rather than copied from a
-dirty development run. Reranker latency is not reported because the plan does
-not name or vendor a cross-encoder.
+and selected local dependencies are present. Candidate values above remain
+explicitly diagnostic until regenerated from a clean commit.
 
 ## Limitations
 
@@ -202,15 +254,12 @@ not name or vendor a cross-encoder.
   from more than half of products, so color has a weaker penalty than material.
 - The deterministic parser targets the organizer's controlled templates and
   common free-form terms; it is not a general natural-language understanding model.
-- The `other` clarification value is a simulator wildcard. ShopLens uses the
-  targeted measured order first and does not lead with this shortcut.
+- The `other` clarification value is a simulator wildcard. ShopLens asks it at
+  most once and otherwise selects a discriminative, non-declined facet.
 - Aggregate profiles contain limited independent signal; they are ingested but
   do not override explicit within-session preferences.
-- Ignoring the simulator phrase “no additional preference” instead of treating
-  it as ordinary soft text was tested and rejected: F dev Score fell from
-  `0.712658` to `0.705789`, including an Intent Override HR@10 drop from
-  `0.6667` to `0.6111`. This is a controlled-language limitation, not a claimed
-  parser improvement.
+- Facet extraction is deliberately shallow and deterministic; it cannot infer
+  every latent product attribute from sparse free-form metadata.
 - The dense model is vendored. The cross-encoder is not specified by the plan;
   if it is absent, G preserves the incoming order without an online download.
 - There is no image input, external vector database, cross-session profiling,

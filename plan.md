@@ -349,16 +349,16 @@ path has exactly one owner and no two concurrent issues share a file.
 |---|---|---|---|---|
 | `src/contracts/` | Human (lead) | No — deny-ruled | — | Done |
 | `src/catalog/` | Retrieval | Yes | contracts | **Done, 18 tests** |
-| `src/retrieval/` | Retrieval | Yes | catalog | Next |
-| `src/state/` | State | Yes | contracts | Seam done |
-| `src/parsing/` | State | Yes | contracts | Open |
-| `src/scoring/` | Scoring | Yes | catalog, contracts | Open |
-| `src/policy/` | Scoring | Yes | state, retrieval | **Done, 34 tests** |
-| `src/eval/` | Infra | Partial | contracts | Open |
-| `src/agent.py` | Human (lead) | No — deny-ruled | all | Skeleton |
+| `src/retrieval/` | Retrieval | Yes | catalog | Done |
+| `src/state/` | State | Yes | contracts | Done |
+| `src/parsing/` | State | Yes | contracts | Done |
+| `src/scoring/` | Scoring | Yes | catalog, contracts | Done |
+| `src/policy/` | Scoring | Yes | state, retrieval | Done |
+| `src/eval/` | Infra | Partial | contracts | Done |
+| `src/agent.py` | Human (lead) | No — deny-ruled | all | Integrated |
 | `starter/agent.py`, `agent.py` | Human (lead) | No | src/agent.py | Done |
-| `tests/` | Per-module | Yes | — | 52+ passing |
-| `README.md`, `docs/` | Writer | Partial | — | Skeleton |
+| `tests/` | Per-module | Yes | — | 103 passing |
+| `README.md`, `docs/` | Writer | Partial | — | Candidate documented; release evidence pending |
 
 **[NEW] Two entry points must stay in sync.** `evaluator/local_evaluator.py`
 hardcodes `from starter.agent import Agent` and is read-only, so that path
@@ -398,11 +398,11 @@ transitions, BM25 wiring, individual scoring components, fixtures — go to
 agents. Anything altering the turn loop, the API contract or the ranking
 objective is `needs_human`.
 
-**[VALIDATED]** This worked in practice: asked to prefer attributes the
-candidates disagree on, the policy agent inspected the `Candidate` contract,
-found it carries no product attribute values, and *stopped and reported*
-rather than inventing a workaround or editing the contract. Both the
-deny-rule and the escalation norm functioned as designed.
+**[VALIDATED]** This worked in practice: the policy work preserved the frozen
+`Candidate` contract and escalated its missing attribute values. The accuracy
+pass then added a read-only catalog-facet accessor, keeping product metadata
+out of the ranking contract while enabling exact candidate-pool information
+gain.
 
 ---
 
@@ -422,6 +422,7 @@ session_memory: bool
 dynamic_weights: bool
 reranker: "none" | "local_cross_encoder"
 llm_rank: bool          # default False
+phrase_rerank: bool     # default False; frozen Top-K membership only
 ```
 
 **[CORRECTED] `clarification` is ON from config A.** Revision 1 measured it
@@ -438,14 +439,17 @@ misattributed E's gain to the wrong variable.
 | F | + dynamic_weights | Value of turn-1 intent routing |
 | G | + reranker | MRR gain |
 | H | G + llm_rank | Only if wall-clock allows; needs offline fallback |
+| P | F + phrase_rerank | Contiguous disclosed-phrase ordering within frozen Top-K |
 | Z | clarification off | **Diagnostic only.** Demonstrates the stall; never reported as a baseline |
 
 Note config A is **not** comparable to the published BM25 baseline — A asks
 questions, the published baseline does not. Report both, and use Z to show
 the gap. That difference is itself a good ablation row.
 
-Every run appends `{config, scores, git_sha}` to `results.jsonl`. That file
-becomes the ablation table in the README.
+Every reportable run appends config flags, scores, Git gates, input/model/vector
+digests, locked environment, effective capabilities, and resource use to
+`results.jsonl`. Dirty diagnostics are restricted to a path outside the
+repository so they cannot contaminate the canonical ablation table.
 
 **Split the 200 public sessions 120 dev / 80 holdout, stratified by
 `scenario_type`.** **[CORRECTED]** — the mix is 80/80/30/10, so an
@@ -495,9 +499,10 @@ public. Whatever is broken at noon stays broken.
 - **Turn limit.** Turns are 1-indexed, 1..10, and there is no recovery
   turn. Our own policy must guarantee a populated `recommendations` list by
   turn 10. Test explicitly.
-- **Never return an empty list.** An empty response scores identically to a
+- **Never return an empty list on a valid turn 1–10.** An empty response scores identically to a
   crash. Fall back to the last non-empty candidate list from earlier in the
-  session, then to a global list — both beat nothing.
+  session, then to a global list — both beat nothing. A request beyond the
+  hard limit is intentionally terminated with no recommendations.
 - **Never let an exception escape `respond()`.** Catch at the
   `src/agent.py` boundary and degrade to a valid, populated response
   (§2.5).

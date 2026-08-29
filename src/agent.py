@@ -10,8 +10,13 @@ from src.contracts.retrieval import Candidate, RetrievalQuery
 from src.contracts.state import SessionState, UserProfile
 from src.parsing import TurnParser
 from src.policy import ClarificationPolicy
-from src.retrieval import BM25Retriever, HybridRetriever, build_retriever
-from src.scoring import ConstraintScorer, DynamicWeightScorer, LocalCrossEncoderReranker
+from src.retrieval import HybridRetriever, build_retriever
+from src.scoring import (
+    ConstraintScorer,
+    DynamicWeightScorer,
+    LocalCrossEncoderReranker,
+    PhraseReranker,
+)
 from src.state import apply_parsed_turn, build_retrieval_query
 
 
@@ -25,13 +30,15 @@ class Agent:
     ) -> None:
         self.config = config if isinstance(config, RunConfig) else get_run_config(config)
         explicit_checksum = os.getenv("SHOPLENS_CATALOG_SHA256") or None
-        skip_pinned_check = os.getenv("SHOPLENS_SKIP_CATALOG_VERIFY", "").lower() in {
-            "1", "true", "yes",
-        }
-        catalog = Path(catalog_path)
+        requested_catalog = Path(catalog_path)
+        uses_default_path = requested_catalog == Path("data/catalog.jsonl")
+        catalog = OFFICIAL_CATALOG_PATH if uses_default_path else requested_catalog
         uses_official_path = catalog.resolve() == OFFICIAL_CATALOG_PATH.resolve()
         self.catalog, self.catalog_checksum_verified = self._load_catalog(
-            catalog, explicit_checksum, skip_pinned_check, uses_official_path,
+            catalog,
+            explicit_checksum,
+            uses_default_path or uses_official_path,
+            build_facets=self.config.clarification == "info_gain",
         )
         self.retriever = build_retriever(self.catalog, self.config)
         self.constraint_scorer = ConstraintScorer(self.catalog)
@@ -41,6 +48,7 @@ class Agent:
             if self.config.reranker == "local_cross_encoder"
             else None
         )
+        self.phrase_reranker = PhraseReranker(self.catalog) if self.config.phrase_rerank else None
         self.parser = TurnParser()
         self.policy = ClarificationPolicy(self.config, self.catalog)
         self._sessions: dict[str, SessionState] = {}
@@ -50,28 +58,26 @@ class Agent:
     def _load_catalog(
         path: Path,
         explicit_checksum: str | None,
-        skip_pinned_check: bool,
-        uses_official_path: bool,
+        enforce_official_checksum: bool,
+        *,
+        build_facets: bool,
     ) -> tuple[Catalog, bool | None]:
-        """Load the catalog, treating the pinned checksum as advisory.
+        """Load a catalog while enforcing every checksum that applies.
 
-        An explicit ``SHOPLENS_CATALOG_SHA256`` is a hard gate. The implicit pin
-        on the official catalog path is only a reproducibility signal: a
-        differing grading catalog must still load rather than brick the agent,
-        so a checksum mismatch falls back to an unverified load. Returns the
-        catalog and whether its checksum was verified (``None`` when no pin
-        applied).
+        The organizer catalog is frozen, so accepting different bytes at its
+        official path would make both recommendations and reported metrics
+        unverifiable. Custom paths may supply their own explicit checksum for
+        local diagnostics.
         """
+        if enforce_official_checksum:
+            return Catalog(
+                path,
+                expected_sha256=OFFICIAL_CATALOG_SHA256,
+                build_facets=build_facets,
+            ), True
         if explicit_checksum is not None:
-            return Catalog(path, expected_sha256=explicit_checksum), True
-        if skip_pinned_check or not uses_official_path:
-            return Catalog(path), None
-        try:
-            return Catalog(path, expected_sha256=OFFICIAL_CATALOG_SHA256), True
-        except ValueError as error:
-            if "checksum mismatch" not in str(error):
-                raise
-            return Catalog(path), False
+            return Catalog(path, expected_sha256=explicit_checksum, build_facets=build_facets), True
+        return Catalog(path, build_facets=build_facets), None
 
     def reset(self, session_id: str, user_profile: dict) -> None:
         self._sessions[str(session_id)] = SessionState(
@@ -93,19 +99,34 @@ class Agent:
             return self.retriever.search_for_intent(query, k, state.intent)
         return self.retriever.search(query, k)
 
-    def _phrase_bonus(
-        self, candidates: list[Candidate], query: RetrievalQuery,
-    ) -> list[Candidate]:
-        """Apply lexical phrase evidence when a BM25 index backs the retriever."""
-        lexical = self.retriever.lexical if isinstance(self.retriever, HybridRetriever) else self.retriever
-        if isinstance(lexical, BM25Retriever):
-            return lexical.add_phrase_bonus(candidates, query)
-        return candidates
+    @staticmethod
+    def _turn_limit_reply() -> dict:
+        return AgentReply(
+            message="This session has reached the 10-turn limit.",
+            ask_attribute=None,
+            recommendations=[],
+            usage=Usage(),
+        ).to_dict()
 
     def _respond(self, session_id: str, user_message: str, turn: int, top_k: int) -> dict:
+        requested_turn = int(turn)
+        if requested_turn > 10:
+            return self._turn_limit_reply()
         state = self._state_for(session_id)
-        safe_turn = max(1, min(10, int(turn)))
+        if state.turn_index >= 10:
+            return self._turn_limit_reply()
+        safe_turn = max(1, requested_turn)
         safe_k = max(1, min(10, int(top_k)))
+        if state.turn_index >= safe_turn:
+            return AgentReply(
+                message="Ignoring a duplicate or out-of-order turn for this session.",
+                ask_attribute=None,
+                recommendations=[
+                    Recommendation(parent_asin=asin)
+                    for asin in self._fallback_asins(state, safe_k)
+                ],
+                usage=Usage(),
+            ).to_dict()
         parsed = self.parser.parse(str(user_message), safe_turn)
         if not self.config.session_memory:
             for slot in state.slots:
@@ -138,8 +159,8 @@ class Agent:
         candidates = sorted(candidates, key=lambda item: (-item.score, item.asin))[:safe_k]
         if self.reranker is not None:
             candidates = self.reranker.rerank(query, candidates)
-        candidates = self._phrase_bonus(candidates, query)
-        candidates = sorted(candidates, key=lambda item: (-item.score, item.asin))[:safe_k]
+        if self.phrase_reranker is not None:
+            candidates = self.phrase_reranker.rerank(state, candidates, pool)
 
         asins = [item.asin for item in candidates]
         if not asins:
@@ -147,7 +168,7 @@ class Agent:
         if asins:
             state.last_recommendations = list(asins)
 
-        ask_attribute = self.policy.choose(state, pool)
+        ask_attribute = self.policy.choose(state, pool, over_general)
         if ask_attribute is not None and ask_attribute not in state.asked_attributes:
             state.asked_attributes.append(ask_attribute)
         return AgentReply(
@@ -165,9 +186,18 @@ class Agent:
             state = self._state_for(session_id)
             safe_k = max(1, min(10, top_k if isinstance(top_k, int) else 10))
             asins = self._fallback_asins(state, safe_k)
+            ask_attribute = (
+                "other"
+                if self.config.clarification != "off"
+                and "other" not in state.asked_attributes
+                and "other" not in state.declined_attributes
+                else None
+            )
+            if ask_attribute is not None:
+                state.asked_attributes.append(ask_attribute)
             return AgentReply(
                 message="Here are reliable catalog options while I refine the search.",
-                ask_attribute=None if self.config.clarification == "off" else "other",
+                ask_attribute=ask_attribute,
                 recommendations=[Recommendation(parent_asin=asin) for asin in asins],
                 usage=Usage(),
             ).to_dict()

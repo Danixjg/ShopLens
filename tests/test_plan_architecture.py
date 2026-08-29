@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+import src.agent as agent_module
 from agent import Agent as SubmissionAgent
 from src.catalog import OFFICIAL_CATALOG_SHA256, Catalog
 from src.contracts.config import CONFIGS, get_run_config
@@ -58,7 +59,7 @@ def test_environment_can_select_hybrid_config(
 
 
 def test_ablation_matrix_has_exact_names() -> None:
-    assert set(CONFIGS) == set("ABCDEFGHZ")
+    assert set(CONFIGS) == set("ABCDEFGHPZ")
 
 
 def test_config_z_is_the_only_no_clarification_diagnostic() -> None:
@@ -73,32 +74,31 @@ def test_catalog_checksum_is_verified(catalog_path: Path) -> None:
         Catalog(catalog_path, expected_sha256="0" * 64)
 
 
-def test_default_catalog_path_pins_checksum_but_stays_advisory(
+def test_default_catalog_path_is_repository_anchored(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    official = tmp_path / "official" / "catalog.jsonl"
+    official.parent.mkdir()
+    official.write_text(json.dumps(ROWS[0]) + "\n", encoding="utf-8")
+    official_digest = hashlib.sha256(official.read_bytes()).hexdigest()
     data = tmp_path / "data"
     data.mkdir()
     path = data / "catalog.jsonl"
-    path.write_text(json.dumps(ROWS[0]) + "\n", encoding="utf-8")
+    path.write_text(json.dumps(ROWS[1]) + "\n", encoding="utf-8")
+    monkeypatch.setattr(agent_module, "OFFICIAL_CATALOG_PATH", official)
+    monkeypatch.setattr(agent_module, "OFFICIAL_CATALOG_SHA256", official_digest)
     monkeypatch.chdir(tmp_path)
-    # A grading catalog that differs from the pin must still load rather than
-    # brick construction; the mismatch is recorded, not raised.
-    agent = SubmissionAgent()
-    assert agent.catalog_checksum_verified is False
-    assert len(agent.catalog) == 1
+    assert SubmissionAgent().catalog.path == official.resolve()
 
 
 def test_explicit_checksum_override_is_a_hard_gate(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    data = tmp_path / "data"
-    data.mkdir()
-    path = data / "catalog.jsonl"
+    path = tmp_path / "custom-catalog.jsonl"
     path.write_text(json.dumps(ROWS[0]) + "\n", encoding="utf-8")
-    monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("SHOPLENS_CATALOG_SHA256", "0" * 64)
     with pytest.raises(ValueError, match="checksum mismatch"):
-        SubmissionAgent()
+        SubmissionAgent(path)
 
 
 def test_default_catalog_checksum_has_expected_release_value() -> None:
@@ -150,12 +150,18 @@ def test_parser_routes_override_scenario_on_first_message() -> None:
     assert parsed.intent == "intent_override"
 
 
-def test_parser_recognizes_boundary_signal_only() -> None:
+def test_parser_keeps_negative_and_control_responses_out_of_retrieval() -> None:
     parser = TurnParser()
     boundary = parser.parse("I don't have a preference for feature; please use your judgment.", 2)
     ordinary = parser.parse("I don't have an additional preference for feature.", 2)
+    control = parser.parse(
+        "Those options are not quite right yet. Ask me about one specific attribute.", 2,
+    )
     assert boundary.declined_attribute == "feature"
-    assert ordinary.declined_attribute is None
+    assert ordinary.declined_attribute == "feature"
+    assert boundary.soft_preferences == ordinary.soft_preferences == ()
+    assert control.declined_attribute is None
+    assert control.soft_preferences == ()
     assert boundary.soft_preferences == ()
 
 
@@ -304,7 +310,7 @@ def test_constraint_scorer_ignores_evaluator_attribute_label(catalog_path: Path)
     scorer = ConstraintScorer(Catalog(catalog_path))
     query = RetrievalQuery("black", hard=(("color", "color: black"),))
     result = scorer.score([Candidate("A", 0.0)], query)
-    assert result[0].components["hard_color_0"] == 1.5
+    assert result[0].components["hard_color"] == 1.5
 
 
 def test_material_penalty_is_stronger_than_color(catalog_path: Path) -> None:
@@ -327,16 +333,19 @@ def test_boundary_policy_excludes_only_the_declined_attribute() -> None:
     assert ClarificationPolicy(CONFIGS["E"]).choose(state, []) == "other"
 
 
-def test_open_question_defers_one_turn_after_being_waved_off() -> None:
+def test_declined_open_question_is_persistently_ineligible() -> None:
     policy = ClarificationPolicy(CONFIGS["E"])
-    refused = SessionState(declined_attributes={"other"}, last_declined="other")
+    refused = SessionState(declined_attributes={"other"})
     assert policy.choose(refused, []) == "feature"
 
 
-def test_open_question_returns_once_the_refusal_turn_has_passed() -> None:
+def test_declined_open_question_does_not_return_later() -> None:
     policy = ClarificationPolicy(CONFIGS["E"])
-    later = SessionState(declined_attributes={"other"}, last_declined=None)
-    assert policy.choose(later, []) == "other"
+    later = SessionState(
+        asked_attributes=["feature", "material", "color"],
+        declined_attributes={"other"},
+    )
+    assert policy.choose(later, []) is None
 
 
 def test_fixed_clarification_retains_measured_priority() -> None:
@@ -385,10 +394,10 @@ def test_repeated_identical_disclosure_does_not_duplicate_a_slot() -> None:
     assert len([slot for slot in state.slots if slot.active]) == 1
 
 
-def test_open_question_repeats_because_each_ask_discloses_more() -> None:
+def test_open_question_is_never_repeated() -> None:
     state = SessionState(asked_attributes=["feature", "material", "color", "other"])
     policy = ClarificationPolicy(CONFIGS["E"])
-    assert policy.choose(state, []) == "other"
+    assert policy.choose(state, []) is None
 
 
 def test_fixed_clarification_uses_other_only_once() -> None:
