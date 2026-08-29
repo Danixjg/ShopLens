@@ -15,11 +15,12 @@
 
 - [ ] A clean install reproduces config A without optional dependencies.
 - [ ] Dense requirements reproduce explicit configs B–H fully offline.
-- [ ] Reportable dev and holdout runs exist for retained configurations.
-- [ ] Every `results.jsonl` row records a clean Git SHA and `reportable: true`.
-- [ ] Results include config flags, effective retriever, dependency/model
-      versions, catalog/dataset digests, cache state, elapsed time, and peak RSS.
-- [ ] README metrics are generated from those durable records only.
+- [x] Reportable dev and holdout runs exist for retained configurations.
+- [x] Canonical `be4017aa` rows record a clean Git SHA and `reportable: true`.
+- [x] Canonical results include config flags, effective capabilities, guarded
+      exception count, dependency/model versions, catalog/dataset digests,
+      cache state, elapsed time, and peak RSS.
+- [x] README metrics are generated from those durable records only.
 
 ## Required external deliverables
 

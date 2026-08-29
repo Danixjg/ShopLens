@@ -124,6 +124,40 @@ records those capability checks and fallback count alongside config flags,
 dependency/model versions, catalog digest, cache state, latency, memory, and
 Git state. Dev and holdout use the deterministic stratified 120/80 split.
 
+### Measured results
+
+The following rows come from clean commit `be4017aa` in `results.jsonl`.
+All A–F rows report zero guarded exceptions; B–F confirm that hybrid retrieval
+loaded rather than using the BM25 fallback. Higher HR@10, MRR, and Score are
+better; lower MTTC is better.
+
+| Config | Dev HR@10 | Dev MRR | Dev MTTC | Dev Score | Holdout HR@10 | Holdout MRR | Holdout MTTC | Holdout Score |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| A | 0.7167 | 0.4687 | 5.1417 | 0.6161 | 0.7500 | 0.4435 | 4.9375 | 0.6293 |
+| B | 0.6417 | 0.3185 | 5.6167 | 0.5241 | 0.6500 | 0.3137 | 5.6375 | 0.5264 |
+| C | 0.8250 | 0.4567 | 4.0000 | 0.6895 | 0.8375 | 0.5027 | 4.1125 | 0.7073 |
+| D | 0.7250 | 0.4296 | 4.7583 | 0.6162 | 0.7500 | 0.4723 | 4.9625 | 0.6374 |
+| E | 0.8250 | 0.4567 | 4.0000 | 0.6895 | 0.8375 | 0.5027 | 4.1125 | 0.7073 |
+| **F** | **0.8417** | **0.5027** | **3.9500** | **0.7127** | **0.8500** | **0.5158** | **4.0125** | **0.7195** |
+
+F is the retained dense configuration: its dynamic Buying route improves C
+on dev and holdout. D shows that removing session memory regresses both; E's
+exact tie with C confirms that the frozen `Candidate` seam cannot supply the
+attribute values needed for the planned disagreement-based policy. B also
+shows that dense fusion alone is not sufficient. Config Z, the diagnostic
+no-clarification run over all 200 sessions, scores only `0.192606` with MTTC
+`8.895`, demonstrating the cost of stalled disclosure.
+
+F's per-scenario evidence is reported explicitly because aggregate gains can
+hide override failures:
+
+| Scenario | Dev HR@10 | Dev MRR | Dev MTTC | Holdout HR@10 | Holdout MRR | Holdout MTTC |
+|---|---:|---:|---:|---:|---:|---:|
+| Boundary | 0.1667 | 0.0417 | 9.6667 | 0.2500 | 0.0250 | 8.5000 |
+| Browsing | 0.8958 | 0.5141 | 3.4792 | 0.8750 | 0.6332 | 3.9375 |
+| Buying | 0.9375 | 0.5937 | 2.8125 | 0.8750 | 0.4288 | 3.2500 |
+| Intent Override | 0.6667 | 0.3836 | 6.3333 | 0.9167 | 0.5980 | 4.7500 |
+
 ## Ablation configurations
 
 Select an ablation with `SHOPLENS_CONFIG`. An unset or unknown value safely
@@ -135,7 +169,7 @@ uses baseline A. Hybrid configurations require the optional dense install.
 | B | Hybrid retrieval |
 | C | Constraint scoring and session memory |
 | D | C with session memory disabled |
-| E | Information-prior clarification; not a distinct reportable run yet |
+| E | Information-prior clarification; measured tie with C because the candidate seam lacks attribute values |
 | F | Dynamic buying/browsing weights |
 | G | Local cross-encoder reranker |
 | H | Optional LLM rank experiment; offline path remains available |
@@ -148,8 +182,8 @@ on both dev and holdout without a severe scenario regression.
 The frozen `Candidate` contract does not expose candidate attribute values, so
 candidate-disagreement information gain cannot be implemented through the
 planned seam. E currently follows the same measured global attribute prior as
-the other clarification-on runs and must not be reported as an independent
-ablation until its plan definition is revised. G likewise requires a specific
+the other clarification-on runs and is reported as a measured no-op rather
+than an improvement. G likewise requires a specific
 vendored cross-encoder that the plan does not name; H remains conditional on a
 wall-clock run and a specified provider. Neither is claimed as completed.
 
@@ -172,6 +206,11 @@ not name or vendor a cross-encoder.
   targeted measured order first and does not lead with this shortcut.
 - Aggregate profiles contain limited independent signal; they are ingested but
   do not override explicit within-session preferences.
+- Ignoring the simulator phrase “no additional preference” instead of treating
+  it as ordinary soft text was tested and rejected: F dev Score fell from
+  `0.712658` to `0.705789`, including an Intent Override HR@10 drop from
+  `0.6667` to `0.6111`. This is a controlled-language limitation, not a claimed
+  parser improvement.
 - The dense model is vendored. The cross-encoder is not specified by the plan;
   if it is absent, G preserves the incoming order without an online download.
 - There is no image input, external vector database, cross-session profiling,

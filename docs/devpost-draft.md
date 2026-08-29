@@ -33,7 +33,8 @@ Buying-versus-Browsing routing rather than destructive filters.
 - Vendored `sentence-transformers/all-MiniLM-L6-v2` model, loaded by local path.
 - No hosted model API, API key, external vector database, or paid service.
 - Prompt tokens: 0. Completion tokens: 0. Model/API cost: $0.
-- Development tools: [add the team's exact editors and collaboration tools].
+- Development tools: Git, pytest, and coordinated OpenAI Codex terminal
+  sessions for implementation and independent review.
 
 ## Data and assets
 
@@ -44,10 +45,22 @@ and model provenance. Full attribution is in `DATA_ATTRIBUTION.md`.
 
 ## Evaluation
 
-Insert only clean-tree records from `results.jsonl` here. Report aggregate and
-per-scenario HR@10, MRR, MTTC, Efficiency, elapsed time, peak RSS, cache state,
-dependency versions, effective retriever, and Git SHA. Include the published
-weak starter, A, B, C, D, E, F, and diagnostic Z where reportable.
+Clean commit `be4017aa` produced the reportable A–F matrix in `results.jsonl`.
+The retained F route scored `0.712658` on the 120-session stratified dev split
+(HR@10 `0.841667`, MRR `0.502748`, MTTC `3.95`) and `0.719476` on the
+80-session holdout (HR@10 `0.85`, MRR `0.515754`, MTTC `4.0125`). The runner
+confirmed effective hybrid retrieval, a cache hit, zero agent exceptions, zero
+tokens, and $0 API cost. Its dev/holdout scenario HR@10 values were Boundary
+`0.166667/0.25`, Browsing `0.895833/0.875`, Buying `0.9375/0.875`, and Intent
+Override `0.666667/0.916667`.
+
+For comparison, C scored `0.689519/0.707318` on dev/holdout, and the
+dependency-free A baseline scored `0.616107/0.629293`. Disabling session memory
+in D regressed both splits. E tied C exactly because the frozen candidate seam
+lacks the attributes required for disagreement-based information gain. The
+200-session diagnostic Z run without clarification scored `0.192606` with
+MTTC `8.895`, quantifying the simulator's disclosure stall. G and H are not
+claimed because no plan-specified offline cross-encoder or LLM provider exists.
 
 ## Limitations and future work
 
