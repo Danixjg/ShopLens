@@ -205,6 +205,13 @@ class Agent:
             candidates = self.ordered_reranker.rerank(state, candidates)
         elif self.phrase_reranker is not None:
             candidates = self.phrase_reranker.rerank(state, candidates, pool)
+        if self.config.rerank_window_scope == "evidence":
+            # Freeze membership before the population-level priors. Popularity
+            # and profile weights were fitted across sessions, so they are not
+            # evidence about this shopper: they may reorder a Top-K the
+            # disclosures already chose, but may not decide who is in it. A
+            # no-op unless the window is wider than the recommendation limit.
+            candidates = candidates[:safe_k]
         if self.popularity_reranker is not None:
             candidates = self.popularity_reranker.rerank(candidates)
         if self.profile_reranker is not None:
