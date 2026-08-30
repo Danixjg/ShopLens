@@ -157,6 +157,14 @@ class Agent:
                 turn_index=query.turn_index,
             )
             candidates = self._search(state, relaxed, depth)
+        if self.config.exclude_shown and query.exclude:
+            # Withhold products already offered. Recall is unaffected because a
+            # session that reached this turn proves none of them was the target.
+            # If that empties the pool, keep the unfiltered one rather than
+            # returning nothing.
+            filtered = [item for item in candidates if item.asin not in query.exclude]
+            if filtered:
+                candidates = filtered
         if self.config.constraint_scoring:
             candidates = self.constraint_scorer.score(candidates, query)
         if self.config.dynamic_weights:
@@ -185,6 +193,10 @@ class Agent:
             asins = self._fallback_asins(state, safe_k)
         if asins:
             state.last_recommendations = list(asins)
+            if self.config.exclude_shown:
+                # Every asin returned is scored by the evaluator, so reaching the
+                # next turn proves none of them was the target.
+                state.shown_asins.update(asins)
 
         ask_attribute = self.policy.choose(
             state,

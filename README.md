@@ -324,6 +324,7 @@ and degrade to BM25 when it is absent.
 | T | R, S, and Q combined, to measure whether the three compose |
 | U | P plus deterministic expected-question-value clarification |
 | V | P plus catalog-population gating of clarification facets |
+| N | Q plus no-repeat recommendations: an asin already offered and scored is withheld from later turns, and an intent override clears that memory |
 | Z | Clarification off, diagnostic only |
 
 U is a documented research ablation, not a retained configuration. Its clean

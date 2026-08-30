@@ -19,4 +19,5 @@ def build_retrieval_query(state: SessionState) -> RetrievalQuery:
         soft=soft,
         category=state.category or None,
         turn_index=max(1, state.turn_index),
+        exclude=frozenset(state.shown_asins),
     )

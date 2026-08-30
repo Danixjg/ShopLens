@@ -13,6 +13,10 @@ class RetrievalQuery:
     soft: ConstraintPairs = ()
     category: str | None = None
     turn_index: int = 1
+    # Asins already returned and scored this session. A turn that did not end
+    # the session proves none of them was the target, so withholding them
+    # costs no recall and frees slots for products not yet offered.
+    exclude: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)
