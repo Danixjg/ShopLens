@@ -107,3 +107,33 @@ def test_readme_ablation_table_documents_every_registered_config() -> None:
     missing = set(CONFIGS) - documented
 
     assert not missing
+
+
+def test_every_tracked_document_link_resolves_in_a_fresh_clone() -> None:
+    """No tracked document may link to a path that is absent from a fresh clone.
+
+    The local paper conversions are deliberately Git-ignored, so linking to one
+    leaves a dead link in the published repository even though the file is
+    present on the author's machine. Scanning every tracked document catches
+    the whole class, including the evidence records under docs/testing.
+    """
+    tracked = subprocess.run(
+        ["git", "ls-files", "*.md"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.split()
+
+    dangling = []
+    for relative in tracked:
+        document = ROOT / relative
+        text = document.read_text(encoding="utf-8")
+        for target in re.findall(r"\]\(([^)]+)\)", text):
+            if "://" in target or target.startswith(("#", "mailto:")):
+                continue
+            path = target.split("#", 1)[0]
+            if path and not (document.parent / path).exists():
+                dangling.append(f"{relative} -> {target}")
+
+    assert not dangling
