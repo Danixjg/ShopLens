@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 
@@ -83,6 +84,8 @@ def test_repository_entry_points_link_the_integration_record() -> None:
         "README.md": _read(ROOT / "README.md"),
         "DATA_ATTRIBUTION.md": _read(ROOT / "DATA_ATTRIBUTION.md"),
         "docs/data-provenance.md": _read(ROOT / "docs" / "data-provenance.md"),
+        "docs/release-checklist.md": _read(ROOT / "docs" / "release-checklist.md"),
+        "docs/demo-script.md": _read(ROOT / "docs" / "demo-script.md"),
     }
     missing = {
         name
@@ -144,3 +147,27 @@ def test_audit_cross_references_the_shared_facet_credit() -> None:
     """One implementation claimed by two source audits must be visible from both."""
     assert "productagent-integration.md" in _read(INTEGRATION_RECORD)
     assert "wizard-of-shopping-integration.md" in _read(PRODUCTAGENT_RECORD)
+
+
+def test_audit_links_resolve_in_a_fresh_clone() -> None:
+    """Every relative link in the audit must exist for someone who clones the repo.
+
+    The local paper conversions are deliberately gitignored, so linking to one
+    leaves a dead link in the published repository even though the file is
+    present on the author's machine.
+    """
+    text = _read(INTEGRATION_RECORD)
+    targets = re.findall(r"\]\(([^)]+)\)", text)
+    relative = [
+        target
+        for target in targets
+        if "://" not in target and not target.startswith("#")
+    ]
+
+    missing = [
+        target
+        for target in relative
+        if not (INTEGRATION_RECORD.parent / target).exists()
+    ]
+
+    assert not missing
