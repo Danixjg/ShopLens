@@ -268,6 +268,7 @@ uses baseline A. Hybrid configurations require the optional dense install.
 | P | F plus membership-preserving phrase-rarity reranking |
 | Q | P plus a bounded rating-count prior inside the frozen Top-10 |
 | U | P plus deterministic expected-question-value clarification |
+| V | P plus catalog-population gating of clarification facets |
 | Z | Clarification off, diagnostic only |
 
 U is a documented research ablation, not a retained configuration. Its clean
@@ -279,6 +280,15 @@ holdout; the reportable dev record remains in `results.jsonl`. U independently
 adapts the paper's EVPI idea into a target-free expected Top-K posterior-mass
 gain over catalog-facet answers. Sparse or missing facets and free-form answers
 outside those catalog proxies limit what the score can represent.
+
+V is implemented but **unevaluated**. It is P with only clarification facet
+eligibility changed: a facet is asked only when at least one candidate in the
+live pool can answer it, with an unconditional fallback so the agent never
+loses the ability to ask. The change is inert without a catalog and cannot
+alter retrieval, scoring, or Top-10 membership. Its retention gate is frozen
+in [the TDD record](docs/testing/facet-population-gate.tdd.md) and no dev or
+holdout run has been performed, so V is not a retained configuration and has
+no row in `results.jsonl`.
 
 Q uses only the immutable organizer catalog. For each member of P's frozen
 Top-10 it log-scales `rating_number` against the catalog maximum and adds
