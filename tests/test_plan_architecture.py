@@ -17,6 +17,8 @@ from src.contracts.state import SessionState
 from src.eval.runner import (
     REFERENCE_REQUIREMENTS,
     _capability_status,
+    _EvaluatorAgentProxy,
+    _latency_summary,
     _lock_entries,
     _locked_environment_snapshot,
 )
@@ -193,6 +195,52 @@ def test_agent_counts_guarded_response_failures(
     status, reasons = _capability_status(agent)
     assert status["agent_exception_count"] == 1
     assert reasons == ["agent fallback handled 1 unexpected exception(s)"]
+
+
+class _StubTurnAgent:
+    """Minimal agent surface for exercising the runner's turn observer."""
+
+    def __init__(self, failing_turns: frozenset[int]) -> None:
+        self.failing_turns = failing_turns
+
+    def reset(self, session_id: str, user_profile: dict) -> None:
+        return None
+
+    def respond(self, session_id: str, user_message: str, turn: int, top_k: int) -> dict:
+        if turn in self.failing_turns:
+            raise RuntimeError("synthetic failure")
+        return {"message": "ok", "ask_attribute": None, "recommendations": []}
+
+
+def test_latency_summary_uses_nearest_rank_percentiles() -> None:
+    summary = _latency_summary([20.0, 5.0, 100.0, 10.0, 15.0])
+    assert summary == {
+        "turns": 5,
+        "p50": 15.0,
+        "p95": 100.0,
+        "p99": 100.0,
+        "max": 100.0,
+        "mean": 30.0,
+    }
+
+
+def test_latency_summary_is_absent_without_measured_turns() -> None:
+    assert _latency_summary([]) is None
+
+
+def test_turn_latency_records_only_turns_that_returned() -> None:
+    proxy = _EvaluatorAgentProxy(_StubTurnAgent(frozenset({2})))
+    proxy.respond("session", "boots", 1, 10)
+    with pytest.raises(RuntimeError):
+        proxy.respond("session", "boots", 2, 10)
+    proxy.respond("session", "boots", 3, 10)
+    assert proxy.raised_exception_count == 1
+    assert proxy.invalid_response_count == 0
+    assert len(proxy.turn_latency_ms) == 2
+    assert all(sample >= 0.0 for sample in proxy.turn_latency_ms)
+    summary = _latency_summary(proxy.turn_latency_ms)
+    assert summary is not None
+    assert summary["turns"] == 2
 
 
 def test_clarification_reply_preserves_buying_route() -> None:
