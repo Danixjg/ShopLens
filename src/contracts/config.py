@@ -135,8 +135,22 @@ CONFIGS: dict[str, RunConfig] = {
     "Z": replace(_A, name="Z", clarification="off"),
 }
 
+# The configuration the submission claims and is graded on. Documented in
+# the README under "Retention decision"; a test binds the two together.
+SUBMISSION_CONFIG_NAME = "T"
+
 
 def get_run_config(name: str | None = None) -> RunConfig:
-    """Resolve a named ablation config; unknown values safely use baseline A."""
-    selected = (name if name is not None else os.getenv("SHOPLENS_CONFIG", "A")).strip().upper()
+    """Resolve a named ablation config.
+
+    An unset environment selects ``SUBMISSION_CONFIG_NAME``, because the
+    official harness constructs the Agent without naming a config and whatever
+    the default resolves to is what actually gets graded. A misspelled name
+    still falls back to baseline A, which needs no optional dependency.
+
+    Selecting a hybrid config is safe without the dense extras: the retriever
+    factory degrades to the deterministic BM25 route rather than failing.
+    """
+    fallback = os.getenv("SHOPLENS_CONFIG", SUBMISSION_CONFIG_NAME)
+    selected = (name if name is not None else fallback).strip().upper()
     return CONFIGS.get(selected, CONFIGS["A"])

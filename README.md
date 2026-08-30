@@ -128,18 +128,20 @@ capability mismatch non-reportable.
 
 ## Reproduce evaluation
 
-Run the reproducible standard-library config A baseline against all 200 public
-sessions. A is the default when `SHOPLENS_CONFIG` is unset:
+Run all 200 public sessions. `SHOPLENS_CONFIG` unset selects the submission
+configuration T, so a bare run reproduces what the official harness grades.
+Without the optional dense dependencies T degrades to the deterministic BM25
+route rather than failing:
 
 ```bash
 python3 -m evaluator.local_evaluator
 ```
 
-After installing the dense dependencies, run the submission config T
-explicitly, or config P for the conservative clean-holdout baseline:
+Name any other ablation explicitly, for example the standard-library baseline A
+or the conservative clean-holdout candidate P:
 
 ```bash
-SHOPLENS_CONFIG=T python3 -m evaluator.local_evaluator
+SHOPLENS_CONFIG=A python3 -m evaluator.local_evaluator
 SHOPLENS_CONFIG=P python3 -m evaluator.local_evaluator
 ```
 
@@ -300,8 +302,10 @@ an exploratory score omits the label.
 
 ## Ablation configurations
 
-Select an ablation with `SHOPLENS_CONFIG`. An unset or unknown value safely
-uses baseline A. Hybrid configurations require the optional dense install.
+Select an ablation with `SHOPLENS_CONFIG`. An unset value selects the
+submission configuration T; an unknown value still falls back safely to
+baseline A. Hybrid configurations use the optional dense install when present
+and degrade to BM25 when it is absent.
 
 | Config | Change from the preceding build |
 |---|---|
