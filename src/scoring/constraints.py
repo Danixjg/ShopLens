@@ -35,6 +35,9 @@ class ConstraintScorer:
         # would double an already dominant penalty/bonus scale.
         hard_terms: dict[str, list[frozenset[str]]] = defaultdict(list)
         soft_terms: dict[str, list[frozenset[str]]] = defaultdict(list)
+        exclude_terms: dict[str, list[frozenset[str]]] = defaultdict(list)
+        for attribute, value in query.exclude:
+            exclude_terms[attribute].append(frozenset(terms(_constraint_value(attribute, value))))
         for attribute, value in query.hard:
             hard_terms[attribute].append(frozenset(terms(_constraint_value(attribute, value))))
         for attribute, value in query.soft:
@@ -57,6 +60,15 @@ class ConstraintScorer:
                 change = soft_weight * overlap
                 adjustment += change
                 components[f"soft_{attribute}"] = change
+            # A replaced preference is scored exactly like a soft one with the
+            # sign reversed, so it inherits the same turn decay instead of
+            # introducing a separately tuned penalty scale.
+            for attribute, unwanted_values in exclude_terms.items():
+                unwanted = frozenset().union(*unwanted_values)
+                overlap = len(unwanted & corpus_terms) / max(1, len(unwanted))
+                change = -soft_weight * overlap
+                adjustment += change
+                components[f"excluded_{attribute}"] = change
             rescored.append(Candidate(candidate.asin, candidate.score + adjustment, components))
         return sorted(rescored, key=lambda item: (-item.score, item.asin))
 

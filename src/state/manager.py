@@ -35,6 +35,7 @@ def apply_parsed_turn(state: SessionState, parsed: ParsedTurn, user_message: str
             for slot in state.slots:
                 if slot.active and not slot.hard and slot.source_turn == superseded_turn:
                     slot.active = False
+                    slot.superseded = True
     elif parsed.intent is not None:
         # Only a turn that actually declares intent may change the route.
         state.intent = parsed.intent

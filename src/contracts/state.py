@@ -35,6 +35,9 @@ class Slot:
     confidence: float
     active: bool
     updated_at: int
+    # Retired because the shopper replaced it, not because it went stale. That
+    # is rejected information and a retrieval signal in its own right.
+    superseded: bool = False
 
 
 @dataclass(slots=True)

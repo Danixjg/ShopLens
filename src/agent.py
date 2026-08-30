@@ -144,7 +144,9 @@ class Agent:
             for slot in state.slots:
                 slot.active = False
         apply_parsed_turn(state, parsed, str(user_message), safe_turn)
-        query = build_retrieval_query(state)
+        query = build_retrieval_query(
+            state, exclude_superseded=self.config.negative_preference,
+        )
 
         depth = max(50, safe_k * 10) if self.config.constraint_scoring else safe_k
         candidates = self._search(state, query, depth)

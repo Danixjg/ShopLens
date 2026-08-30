@@ -325,6 +325,7 @@ and degrade to BM25 when it is absent.
 | U | P plus deterministic expected-question-value clarification |
 | V | P plus catalog-population gating of clarification facets |
 | W | T with the dense encoder indexing title, categories and features only |
+| X | T plus suppression of a preference the shopper replaced on override |
 | Z | Clarification off, diagnostic only |
 
 U is a documented research ablation, not a retained configuration. Its clean

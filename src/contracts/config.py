@@ -43,6 +43,7 @@ class RunConfig:
     popularity_rerank_weight: float = 0.0
     profile_rerank_weight: float = 0.0
     dense_text_recipe: DenseTextRecipe = "full"
+    negative_preference: bool = False
 
 
 _A = RunConfig()
@@ -155,6 +156,25 @@ CONFIGS: dict[str, RunConfig] = {
         popularity_rerank=True,
         popularity_rerank_weight=POPULARITY_RERANK_WEIGHT,
         dense_text_recipe="compact",
+    ),
+    # Research-derived ablation: T with only overridden-preference exclusion
+    # added. A value the shopper replaces is rejected information; without this
+    # the retrieval seam cannot tell it from a value never mentioned.
+    "X": replace(
+        _A,
+        name="X",
+        retrieval_mode="hybrid",
+        constraint_scoring=True,
+        session_memory=True,
+        clarification="info_gain",
+        dynamic_weights=True,
+        phrase_rerank=True,
+        symmetric_intent_routing=True,
+        profile_rerank=True,
+        profile_rerank_weight=PROFILE_RERANK_WEIGHT,
+        popularity_rerank=True,
+        popularity_rerank_weight=POPULARITY_RERANK_WEIGHT,
+        negative_preference=True,
     ),
     "Z": replace(_A, name="Z", clarification="off"),
 }

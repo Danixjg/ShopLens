@@ -11,6 +11,7 @@ class RetrievalQuery:
     text: str
     hard: ConstraintPairs = ()
     soft: ConstraintPairs = ()
+    exclude: ConstraintPairs = ()
     category: str | None = None
     turn_index: int = 1
 
