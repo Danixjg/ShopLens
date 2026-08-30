@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 from pathlib import Path
@@ -137,3 +138,63 @@ def test_every_tracked_document_link_resolves_in_a_fresh_clone() -> None:
                 dangling.append(f"{relative} -> {target}")
 
     assert not dangling
+
+
+RESULTS_LOG = ROOT / "results.jsonl"
+CLEAN_HOLDOUT_CONFIGS = ("P", "R", "S")
+EXPLORATORY_HOLDOUT_CONFIGS = ("Q", "T")
+
+
+def _reported_score(config: str, split: str) -> str:
+    """Latest reportable TechnicalScore for one config and split.
+
+    Documents must quote the evidence log rather than a remembered number, so
+    the expectation is derived from the log instead of hard-coded.
+    """
+    scores = []
+    for line in RESULTS_LOG.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        row = json.loads(line)
+        if row["config"] == config and row["split"] == split and row["reportable"]:
+            scores.append(row["scores"]["recommended_technical_score"])
+    assert scores, f"no reportable {split} row for config {config}"
+    return f"{scores[-1]:.6f}"
+
+
+def test_readme_reports_every_measured_candidate_on_both_splits() -> None:
+    """A candidate with reportable dev and holdout rows must appear with both.
+
+    Reporting only the configurations that flatter the submission is the
+    failure this guards against.
+    """
+    text = (ROOT / "README.md").read_text(encoding="utf-8")
+
+    missing = [
+        f"{config}/{split}={_reported_score(config, split)}"
+        for config in CLEAN_HOLDOUT_CONFIGS + EXPLORATORY_HOLDOUT_CONFIGS
+        for split in ("dev", "holdout")
+        if _reported_score(config, split) not in text
+    ]
+
+    assert not missing
+
+
+def test_readme_never_quotes_an_exploratory_score_without_the_label() -> None:
+    """Q and T carry the popularity prior, so their holdout rows are exploratory.
+
+    Every line quoting one of those numbers must say so on that same line. This
+    is what stops the caveat drifting away from the figure it qualifies once the
+    number starts to look good.
+    """
+    lines = (ROOT / "README.md").read_text(encoding="utf-8").splitlines()
+
+    unlabelled = [
+        f"{config} {score}: {line.strip()[:70]}"
+        for config in EXPLORATORY_HOLDOUT_CONFIGS
+        for score in (_reported_score(config, "holdout"),)
+        for line in lines
+        if score in line and "exploratory" not in line.casefold()
+    ]
+
+    assert not unlabelled
