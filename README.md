@@ -324,6 +324,7 @@ and degrade to BM25 when it is absent.
 | T | R, S, and Q combined, to measure whether the three compose |
 | U | P plus deterministic expected-question-value clarification |
 | V | P plus catalog-population gating of clarification facets |
+| W | T with the dense encoder indexing title, categories and features only |
 | Z | Clarification off, diagnostic only |
 
 U is a documented research ablation, not a retained configuration. Its clean

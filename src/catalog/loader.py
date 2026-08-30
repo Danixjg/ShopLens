@@ -146,6 +146,34 @@ class Product:
             ) if part
         )
 
+    @property
+    def compact_text(self) -> str:
+        """High-signal fields only, mirroring the BM25 column weights.
+
+        The lexical index already ranks these fields highest (title 6.0,
+        categories 4.0, features 2.5) and `details`, `store` and `description`
+        lowest. The dense encoder had no such distinction: it embedded the flat
+        concatenation, where the median product spends most of its budget on
+        those low-weight tails. Because the vendored encoder truncates at 256
+        word pieces and mean-pools what survives, the tails both overflow the
+        window and pull the vector toward a generic centroid.
+        """
+        return " ".join(
+            part for part in (self.title, self.categories, self.features) if part
+        )
+
+
+
+DENSE_TEXT_RECIPES = ("full", "compact")
+
+
+def dense_text(product: Product, recipe: str) -> str:
+    """Text the dense encoder indexes for one product under a named recipe.
+
+    An unrecognised recipe falls back to the historical full concatenation, so
+    a malformed config can never quietly index something new.
+    """
+    return product.compact_text if recipe == "compact" else product.searchable_text
 
 @dataclass(frozen=True, slots=True)
 class _CatalogRecord:

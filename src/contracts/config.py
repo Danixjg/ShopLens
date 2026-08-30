@@ -8,6 +8,9 @@ from typing import Literal
 RetrievalMode = Literal["bm25", "dense", "hybrid"]
 ClarificationMode = Literal["off", "empty_result_only", "info_gain", "expected_value"]
 RerankerMode = Literal["none", "local_cross_encoder"]
+# What the dense encoder indexes. "full" is the historical flat concatenation;
+# "compact" keeps only the fields the BM25 index already weights highest.
+DenseTextRecipe = Literal["full", "compact"]
 
 HIT_RATE_WEIGHT = 0.50
 MRR_WEIGHT = 0.30
@@ -39,6 +42,7 @@ class RunConfig:
     facet_population_gate: bool = False
     popularity_rerank_weight: float = 0.0
     profile_rerank_weight: float = 0.0
+    dense_text_recipe: DenseTextRecipe = "full"
 
 
 _A = RunConfig()
@@ -131,6 +135,26 @@ CONFIGS: dict[str, RunConfig] = {
         dynamic_weights=True,
         phrase_rerank=True,
         facet_population_gate=True,
+    ),
+    # Research-derived ablation: T with only the dense encoder's input text
+    # changed. The lexical index already weights title, categories and features
+    # highest and the low-weight tails overflow the encoder's 256 word-piece
+    # window, so this measures whether the dense half was being diluted.
+    "W": replace(
+        _A,
+        name="W",
+        retrieval_mode="hybrid",
+        constraint_scoring=True,
+        session_memory=True,
+        clarification="info_gain",
+        dynamic_weights=True,
+        phrase_rerank=True,
+        symmetric_intent_routing=True,
+        profile_rerank=True,
+        profile_rerank_weight=PROFILE_RERANK_WEIGHT,
+        popularity_rerank=True,
+        popularity_rerank_weight=POPULARITY_RERANK_WEIGHT,
+        dense_text_recipe="compact",
     ),
     "Z": replace(_A, name="Z", clarification="off"),
 }
