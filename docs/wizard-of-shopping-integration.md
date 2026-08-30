@@ -48,11 +48,56 @@ not sufficient permission to copy an artifact.
 | Decision | TRACER/WoS concept | ShopLens treatment |
 |---|---|---|
 | Adopt | Wanted, unwanted, and optional preference semantics | Extend the existing slot and declined-attribute model only where tests show missing behavior. Implement independently and cite TRACER as the methodological influence. |
-| Adopt | Catalog-aware aspect selection | Treat the current candidate-pool information-gain policy as the starting point. Preserve non-filtering constraints and compare it with any broader facet policy before replacing it. |
+| Tested, not retained | Catalog-aware aspect selection | Built as ablation config `V` and measured once on the frozen dev split. It tied `P` exactly, so the existing candidate-pool information-gain policy stands unchanged. See [Measured outcomes](#measured-outcomes). |
 | Evaluate | Attributed synthetic dialogue fixtures | Generate fixtures only from the immutable ShopLens catalog and deterministic local rules. Mark them as ShopLens-generated and TRACER-inspired; do not derive them from WoS dialogue text. |
-| Evaluate | Frequent-value clarification hints and facet hygiene | Test concise hints and noisy-facet suppression behind a new ablation config on the frozen dev split. Retain only changes with reproducible ranking or dialogue-quality evidence. |
+| Evaluate, half answered | Frequent-value clarification hints and facet hygiene | Noisy-facet suppression was built as `V`, produced no ranking evidence, and is not retained. Concise clarification hints were never built and remain genuinely open, still subject to the same dev-split rule. |
 | Defer | Upstream TRACER implementation and WoS dataset | Keep both outside the repository until explicit compatible terms are verified. Do not translate or mechanically reproduce upstream source code. |
 | Defer | LLM verbalization and CQG/CPR fine-tuning | ShopLens must remain useful offline and deterministic. These experiments require a separate approved plan, dependencies, model provenance, and resource budget. |
+
+## Measured outcomes
+
+Two ideas from this audit were implemented independently, isolated behind named
+ablation configs, and measured once each on the deterministic 120-session dev
+split under pre-registered retention gates. Neither was retained. The gates were
+frozen before the runs, so these are decisions the evidence made, not decisions
+made about the evidence.
+
+| Config | Idea under test | Dev TechnicalScore | Outcome |
+|---|---|---:|---|
+| `P` | retained baseline | `0.819939` | — |
+| `U` | expected-question-value clarification, the planner comparison this record demanded | `0.819730` | **Rejected on the gate.** Below P, so holdout was never opened. |
+| `V` | catalog-population gating of clarification facets | `0.819939` | **Cleared the gate only by an exact tie. Not retained.** |
+
+`U` is the direct test of the decision-tree planner gap. It adapts the paper's
+expected-value-of-information idea into a target-free expected Top-K posterior
+mass. HR@10 held at P's value and MRR rose slightly, but MTTC moved from
+`3.133333` to `3.175000`, so TechnicalScore fell by `0.000209` and the
+pre-registered gate rejected it without a holdout run.
+
+`V` is the catalog-aware aspect-selection test. It matched `P` to the last
+recorded digit on every metric, every scenario, and the turn count. The cause is
+measurable rather than mysterious: the gate drops a facet only when *no*
+candidate in the pool carries a value for it, and across the 50,000-product
+official catalog `feature` — which is asked first — is populated on **99.43%**
+of products (`material` 58.09%, `color` 32.84%, with only 245 products empty on
+all three). The condition the unit tests construct synthetically does not arise
+in real retrieved pools, so the gate never fires.
+
+The honest reading is that this record's caution was vindicated. The paper's
+methods are sound, but on ShopLens's catalog and contract the existing
+information-gain policy already captures the available benefit, and two
+independent attempts to improve on it measured no gain. A rejected config with a
+reportable row is a stronger result than an adopted idea with no measurement.
+
+### Shared credit with the ProductAgent audit
+
+Catalog-population facet filtering is claimed by two source audits. The
+implementation credits Ye et al. (ProductAgent, arXiv:2407.00942) in
+[`productagent-integration.md`](productagent-integration.md), which is where its
+adoption boundary is recorded; this record lists the same behavior as
+catalog-aware aspect selection. One implementation, two independent
+motivations, one credit — noted here so the overlap is not mistaken for two
+separate adoptions.
 
 ## Non-negotiable architecture guards
 
@@ -68,9 +113,12 @@ not sufficient permission to copy an artifact.
 
 The current information-gain clarification policy already implements the
 central intuition of asking about a facet that divides the remaining candidate
-space. The next implementation stage must first test the behavioral gap between
-that policy and the paper's repeatedly fitted decision-tree planner; sharing an
-intuition is not evidence that a second implementation improves ShopLens.
+space. This record previously required that the behavioral gap between that
+policy and the paper's repeatedly fitted decision-tree planner be tested before
+any adoption, on the principle that sharing an intuition is not evidence that a
+second implementation improves ShopLens. **That prerequisite has been
+discharged.** Both experiments were run and both came back negative; the
+results are recorded in [Measured outcomes](#measured-outcomes) below.
 
 ## Attribution for future derivatives
 
