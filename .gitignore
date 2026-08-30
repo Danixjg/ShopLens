@@ -5,6 +5,7 @@ __pycache__/
 # Local dependency environments, including the optional uv path in README.
 .venv/
 .venv-dense/
+.venv-wsl/
 venv/
 results.json
 data/catalog.jsonl
