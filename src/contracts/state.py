@@ -47,4 +47,5 @@ class SessionState:
     asked_attributes: list[AskAttribute] = field(default_factory=list)
     declined_attributes: set[str] = field(default_factory=set)
     last_recommendations: list[str] = field(default_factory=list)
+    shown_asins: set[str] = field(default_factory=set)
     user_profile: UserProfile | None = None

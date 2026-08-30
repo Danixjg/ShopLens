@@ -37,6 +37,8 @@ class RunConfig:
     symmetric_intent_routing: bool = False
     profile_rerank: bool = False
     facet_population_gate: bool = False
+    exclude_shown: bool = False
+    ordered_rerank: bool = False
     popularity_rerank_weight: float = 0.0
     profile_rerank_weight: float = 0.0
 
@@ -131,6 +133,41 @@ CONFIGS: dict[str, RunConfig] = {
         dynamic_weights=True,
         phrase_rerank=True,
         facet_population_gate=True,
+    ),
+    # Q plus no-repeat recommendations. Every asin returned is scored, so a turn
+    # that did not end the session proves none of them was the target; they are
+    # withheld from later turns instead of being offered again. An intent
+    # override clears that memory, because a hit cannot register before the
+    # override turn and those candidates were therefore never tested.
+    "N": replace(
+        _A,
+        name="N",
+        retrieval_mode="hybrid",
+        constraint_scoring=True,
+        session_memory=True,
+        clarification="info_gain",
+        dynamic_weights=True,
+        phrase_rerank=True,
+        popularity_rerank=True,
+        popularity_rerank_weight=POPULARITY_RERANK_WEIGHT,
+        exclude_shown=True,
+    ),
+    # N with the phrase reranker replaced by disclosure-order ranking, so a
+    # candidate satisfying more of what the shopper said always outranks one
+    # satisfying fewer, rather than more inverse-frequency evidence winning.
+    "O": replace(
+        _A,
+        name="O",
+        retrieval_mode="hybrid",
+        constraint_scoring=True,
+        session_memory=True,
+        clarification="info_gain",
+        dynamic_weights=True,
+        phrase_rerank=True,
+        popularity_rerank=True,
+        popularity_rerank_weight=POPULARITY_RERANK_WEIGHT,
+        exclude_shown=True,
+        ordered_rerank=True,
     ),
     "Z": replace(_A, name="Z", clarification="off"),
 }

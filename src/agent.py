@@ -11,6 +11,7 @@ from src.contracts.state import SessionState, UserProfile
 from src.parsing import TurnParser
 from src.policy import ClarificationPolicy
 from src.retrieval import HybridRetriever, build_retriever
+from src.scoring.ordered import OrderedConstraintReranker
 from src.scoring import (
     ConstraintScorer,
     DynamicWeightScorer,
@@ -51,6 +52,9 @@ class Agent:
             else None
         )
         self.phrase_reranker = PhraseReranker(self.catalog) if self.config.phrase_rerank else None
+        self.ordered_reranker = (
+            OrderedConstraintReranker(self.catalog) if self.config.ordered_rerank else None
+        )
         self.popularity_reranker = (
             PopularityReranker(self.catalog, self.config.popularity_rerank_weight)
             if self.config.popularity_rerank
@@ -157,6 +161,14 @@ class Agent:
                 turn_index=query.turn_index,
             )
             candidates = self._search(state, relaxed, depth)
+        if self.config.exclude_shown and query.exclude:
+            # Withhold products already offered. Recall is unaffected because a
+            # session that reached this turn proves none of them was the target.
+            # If that empties the pool, keep the unfiltered one rather than
+            # returning nothing.
+            filtered = [item for item in candidates if item.asin not in query.exclude]
+            if filtered:
+                candidates = filtered
         if self.config.constraint_scoring:
             candidates = self.constraint_scorer.score(candidates, query)
         if self.config.dynamic_weights:
@@ -171,7 +183,11 @@ class Agent:
         candidates = sorted(candidates, key=lambda item: (-item.score, item.asin))[:safe_k]
         if self.reranker is not None:
             candidates = self.reranker.rerank(query, candidates)
-        if self.phrase_reranker is not None:
+        if self.ordered_reranker is not None:
+            # Replaces the phrase reranker rather than stacking on it: both
+            # order the same frozen set from the same disclosures.
+            candidates = self.ordered_reranker.rerank(state, candidates)
+        elif self.phrase_reranker is not None:
             candidates = self.phrase_reranker.rerank(state, candidates, pool)
         if self.popularity_reranker is not None:
             candidates = self.popularity_reranker.rerank(candidates)
@@ -185,6 +201,10 @@ class Agent:
             asins = self._fallback_asins(state, safe_k)
         if asins:
             state.last_recommendations = list(asins)
+            if self.config.exclude_shown:
+                # Every asin returned is scored by the evaluator, so reaching the
+                # next turn proves none of them was the target.
+                state.shown_asins.update(asins)
 
         ask_attribute = self.policy.choose(
             state,
