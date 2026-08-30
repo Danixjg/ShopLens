@@ -180,21 +180,21 @@ def test_readme_reports_every_measured_candidate_on_both_splits() -> None:
     assert not missing
 
 
-def test_readme_never_quotes_an_exploratory_score_without_the_label() -> None:
+def test_public_docs_never_quote_an_exploratory_score_without_the_label() -> None:
     """Q and T carry the popularity prior, so their holdout rows are exploratory.
 
-    Every line quoting one of those numbers must say so on that same line. This
-    is what stops the caveat drifting away from the figure it qualifies once the
-    number starts to look good.
+    Every line quoting one of those numbers, in any release-facing document,
+    must say so on that same line. This is what stops the caveat drifting away
+    from the figure it qualifies once the number starts to look good. "Clean
+    reportable run" and "clean holdout" mean different things, and a reader
+    skimming a single sentence must not be able to confuse them.
     """
-    lines = (ROOT / "README.md").read_text(encoding="utf-8").splitlines()
-
-    unlabelled = [
-        f"{config} {score}: {line.strip()[:70]}"
-        for config in EXPLORATORY_HOLDOUT_CONFIGS
-        for score in (_reported_score(config, "holdout"),)
-        for line in lines
-        if score in line and "exploratory" not in line.casefold()
-    ]
+    unlabelled = []
+    for path in PUBLIC_CREDIT:
+        for config in EXPLORATORY_HOLDOUT_CONFIGS:
+            score = _reported_score(config, "holdout")
+            for line in path.read_text(encoding="utf-8").splitlines():
+                if score in line and "exploratory" not in line.casefold():
+                    unlabelled.append(f"{path.name} {config} {score}: {line.strip()[:60]}")
 
     assert not unlabelled
