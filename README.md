@@ -267,6 +267,9 @@ uses baseline A. Hybrid configurations require the optional dense install.
 | H | Optional LLM rank experiment; offline path remains available |
 | P | F plus membership-preserving phrase-rarity reranking |
 | Q | P plus a bounded rating-count prior inside the frozen Top-10 |
+| R | P plus precision retrieval routing for every hard-constraint intent, not Buying alone |
+| S | P plus a bounded user-profile affinity prior inside the frozen Top-10 |
+| T | R, S, and Q combined, to measure whether the three compose |
 | U | P plus deterministic expected-question-value clarification |
 | V | P plus catalog-population gating of clarification facets |
 | Z | Clarification off, diagnostic only |
