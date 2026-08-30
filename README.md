@@ -326,6 +326,7 @@ and degrade to BM25 when it is absent.
 | V | P plus catalog-population gating of clarification facets |
 | W | T with the dense encoder indexing title, categories and features only |
 | X | T plus suppression of a preference the shopper replaced on override |
+| Y | T with reranking applied to the top 50 before truncation, so it can change Top-10 membership |
 | Z | Clarification off, diagnostic only |
 
 U is a documented research ablation, not a retained configuration. Its clean

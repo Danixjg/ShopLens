@@ -44,6 +44,9 @@ class RunConfig:
     profile_rerank_weight: float = 0.0
     dense_text_recipe: DenseTextRecipe = "full"
     negative_preference: bool = False
+    # Candidates handed to the rerankers before truncation. 0 keeps Top-K
+    # membership frozen, which is the historical behaviour.
+    rerank_window: int = 0
 
 
 _A = RunConfig()
@@ -175,6 +178,26 @@ CONFIGS: dict[str, RunConfig] = {
         popularity_rerank=True,
         popularity_rerank_weight=POPULARITY_RERANK_WEIGHT,
         negative_preference=True,
+    ),
+    # Research-derived ablation: T with only the rerank window widened, so the
+    # existing rerankers may decide Top-10 membership instead of only its order.
+    # Phase 0 measured three dev misses within 0.002 of the tenth-place score,
+    # which no post-truncation reranker could ever reach.
+    "Y": replace(
+        _A,
+        name="Y",
+        retrieval_mode="hybrid",
+        constraint_scoring=True,
+        session_memory=True,
+        clarification="info_gain",
+        dynamic_weights=True,
+        phrase_rerank=True,
+        symmetric_intent_routing=True,
+        profile_rerank=True,
+        profile_rerank_weight=PROFILE_RERANK_WEIGHT,
+        popularity_rerank=True,
+        popularity_rerank_weight=POPULARITY_RERANK_WEIGHT,
+        rerank_window=50,
     ),
     "Z": replace(_A, name="Z", clarification="off"),
 }
