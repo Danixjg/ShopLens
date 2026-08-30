@@ -52,5 +52,11 @@ third-party media.
 6. Close with limitations: Boundary signal, controlled-language parsing,
    metadata sparsity, and optional LLM/cross-encoder work not claimed.
 
+Research credit: any adapted published method named on screen must credit its
+source. The surveyed ideas and their adoption boundaries are recorded in
+`docs/productagent-integration.md` and `docs/wizard-of-shopping-integration.md`.
+Both ablations those audits govern were measured and neither was retained, so
+do not present config U or V as a shipped feature.
+
 Before recording, replace every placeholder in `docs/devpost-draft.md`, verify
 the repository is public, and confirm the final YouTube video is public.

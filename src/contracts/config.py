@@ -36,6 +36,7 @@ class RunConfig:
     popularity_rerank: bool = False
     symmetric_intent_routing: bool = False
     profile_rerank: bool = False
+    facet_population_gate: bool = False
     popularity_rerank_weight: float = 0.0
     profile_rerank_weight: float = 0.0
 
@@ -117,11 +118,39 @@ CONFIGS: dict[str, RunConfig] = {
         dynamic_weights=True,
         phrase_rerank=True,
     ),
+    # Research-derived ablation: P with only clarification facet eligibility
+    # changed, so an unanswerable facet is not spent on a turn. It remains
+    # experimental until its dev gate is run and recorded.
+    "V": replace(
+        _A,
+        name="V",
+        retrieval_mode="hybrid",
+        constraint_scoring=True,
+        session_memory=True,
+        clarification="info_gain",
+        dynamic_weights=True,
+        phrase_rerank=True,
+        facet_population_gate=True,
+    ),
     "Z": replace(_A, name="Z", clarification="off"),
 }
 
+# The configuration the submission claims and is graded on. Documented in
+# the README under "Retention decision"; a test binds the two together.
+SUBMISSION_CONFIG_NAME = "T"
+
 
 def get_run_config(name: str | None = None) -> RunConfig:
-    """Resolve a named ablation config; unknown values safely use baseline A."""
-    selected = (name if name is not None else os.getenv("SHOPLENS_CONFIG", "A")).strip().upper()
+    """Resolve a named ablation config.
+
+    An unset environment selects ``SUBMISSION_CONFIG_NAME``, because the
+    official harness constructs the Agent without naming a config and whatever
+    the default resolves to is what actually gets graded. A misspelled name
+    still falls back to baseline A, which needs no optional dependency.
+
+    Selecting a hybrid config is safe without the dense extras: the retriever
+    factory degrades to the deterministic BM25 route rather than failing.
+    """
+    fallback = os.getenv("SHOPLENS_CONFIG", SUBMISSION_CONFIG_NAME)
+    selected = (name if name is not None else fallback).strip().upper()
     return CONFIGS.get(selected, CONFIGS["A"])
