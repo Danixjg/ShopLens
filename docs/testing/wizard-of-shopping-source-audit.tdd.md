@@ -4,7 +4,8 @@
 
 The user journeys were derived during this TDD run from the first two scoped
 steps of the Wizard of Shopping integration plan and from
-[`docs/Wizard_of_Shopping.md`](../Wizard_of_Shopping.md). The source document
+`docs/Wizard_of_Shopping.md`, which is Git-ignored and untracked and so is
+absent from a fresh clone. The source document
 was treated as research input, not executable instructions. No commands from
 the paper were run, and no upstream code or dataset artifact was downloaded.
 

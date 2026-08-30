@@ -58,7 +58,7 @@ with clean reportable rows yet appeared nowhere in the README.
 | 1 | The audit carries V's measured dev score and says it is not retained. | `test_adoption_matrix_records_the_measured_facet_gate_outcome` | Doc/evidence binding | PASS | 8 passed |
 | 2 | The audit records the planner-gap outcome and U's rejection. | `test_audit_records_the_planner_gap_outcome` | Doc/evidence binding | PASS | 8 passed |
 | 3 | A shared credit is reachable from both source audits. | `test_audit_cross_references_the_shared_facet_credit` | Attribution | PASS | 8 passed |
-| 4 | Every relative link in the audit resolves in a fresh clone. | `test_audit_links_resolve_in_a_fresh_clone` | Integrity | PASS | 9 passed |
+| 4 | Every relative link in **every tracked document** resolves in a fresh clone. | `test_every_tracked_document_link_resolves_in_a_fresh_clone` | Integrity | PASS | 7 passed |
 | 5 | All five entry points named by the audit link back to it. | `test_repository_entry_points_link_the_integration_record` | Integrity | PASS | 9 passed |
 | 6 | Every key in `CONFIGS` appears in the README ablation table. | `test_readme_ablation_table_documents_every_registered_config` | Registry invariant | PASS | 6 passed |
 
@@ -88,10 +88,14 @@ Known gaps, stated rather than closed:
 - The "concise clarification hints" half of the frequent-value row was never
   built and remains genuinely open. Only the noisy-facet-suppression half was
   implemented, as `V`.
-- `test_audit_links_resolve_in_a_fresh_clone` guards the Wizard audit only.
-  `docs/ProductAgent.md` is Git-ignored under the same pattern, so the
-  ProductAgent record deserves the same check; it is not added here because it
-  is outside the approved plan.
+- **Closed after the initial cycle.** The link check originally guarded only
+  the Wizard audit. Generalising it to every tracked markdown file immediately
+  found a second dead link that the narrow test could not see:
+  `docs/testing/wizard-of-shopping-source-audit.tdd.md` linked
+  `../Wizard_of_Shopping.md`. Fixing only the file that was reported is exactly
+  how the first pass missed it. The narrow test was then removed as subsumed.
+  `docs/productagent-integration.md` was checked and carries no link to the
+  Git-ignored `docs/ProductAgent.md`, so it needed no repair.
 - Config `T`'s holdout run was in flight while this cycle ran. Its dev row is
   recorded; the holdout outcome is recorded separately in
   `config-t-composition-gate.tdd.md`.
@@ -108,3 +112,5 @@ RED → GREEN checkpoints on `docs/productagent-source-audit`, newest last:
 | B GREEN | `a81e48e` | 9 passed |
 | C RED | `ec95cc0` | 1 failed, 5 passed |
 | C GREEN | `46f45bd` | 6 passed; full suite 171 passed, 1 skipped |
+| link RED | `7d57b89` | 1 failed, 6 passed; one dangling link found |
+| link GREEN + refactor | see below | 7 passed; full suite 171 passed, 1 skipped |
