@@ -138,3 +138,111 @@ control evidence rather than compared to the canonical number.
 Both checkpoints were created on `docs/productagent-source-audit`. Preserve
 this RED/GREEN summary in the PR or squash commit body if the commits are later
 squashed.
+
+## Gate outcome, recorded 2026-08-30
+
+The gate above was frozen before any run. It has now been executed once on
+the dev split and is recorded here unchanged. Nothing in config `V` was
+modified, retuned, or adjusted after seeing a result.
+
+### Environment
+
+The reference environment was available, so the local-control fallback was
+not needed. Both runs come from clean commit `547bdb1` and were accepted as
+`"reportable": true` with no reportability reasons.
+
+| Requirement | Observed |
+|---|---|
+| CPython 3.12, Linux x86-64 | CPython 3.12.13, Linux x86_64, WSL2 kernel `6.18.33.2-microsoft-standard-WSL2` |
+| `requirements-dense.lock.txt` | lock `bcc0ef81…`, 62 hash-pinned entries, `requirements_lock_mismatches: []` |
+| Official catalog | `da979b05…` |
+| Official public set | `857259f7…` |
+| Clean tree | `start_dirty`/`end_dirty`/`final_dirty` all false |
+
+P's canonical rows were produced on CPython 3.12.3; this environment runs
+3.12.13 with the identical lock. Because the frozen gate compares against
+P's canonical threshold, P was re-run here as an in-environment control
+before V, in one non-adaptive sequence.
+
+**Comparability is established, not assumed.** Local P reproduces canonical
+P on the dev split exactly:
+
+| Metric | Canonical P dev (`6c0f1357`) | Local P dev (`547bdb1`) |
+|---|---|---|
+| TechnicalScore | 0.819939 | 0.819939 |
+| HitRate@10 | 0.941667 | 0.941667 |
+| MRR | 0.639239 | 0.639239 |
+| MTTC | 3.133333 | 3.133333 |
+| Efficiency | 0.786667 | 0.786667 |
+
+The `embeddings_sha256` does differ (`50911a08…` canonical vs `40aacc4c…`
+here): a different CPU reduces float operations in a different order, so the
+embedding bytes are not identical. No metric moves as a result, on any split
+or scenario, so the difference is below the resolution that changes a
+ranking. The canonical threshold is therefore directly usable.
+
+### Result
+
+`python3 -m src.eval.runner --config P --split dev` then
+`--config V --split dev`, run back to back at `547bdb1`.
+
+| Gate criterion | Threshold | V observed | Verdict |
+|---|---|---|---|
+| dev TechnicalScore | ≥ 0.819939 | 0.819939 | PASS |
+| dev HitRate@10 | ≥ 0.941667 | 0.941667 | PASS |
+| scenario `boundary` | ≥ 0.839167 | 0.859167 (Δ +0.000000) | PASS |
+| scenario `browsing` | ≥ 0.837904 | 0.857904 (Δ +0.000000) | PASS |
+| scenario `buying` | ≥ 0.781674 | 0.801674 (Δ +0.000000) | PASS |
+| scenario `intent_override` | ≥ 0.734325 | 0.754325 (Δ +0.000000) | PASS |
+| agent exceptions | 0 | 0 | PASS |
+| evaluator exceptions | 0 | 0 | PASS |
+| evaluator invalid responses | 0 | 0 | PASS |
+
+**Verdict: the dev gate passes, which permits the one holdout opening.**
+
+### The result that matters: V is inert on this catalog
+
+V does not merely pass; it ties P to the last recorded digit on every
+metric, every scenario, and the turn count (369 turns for both). The gate
+changed no question on any of the 120 dev sessions.
+
+The cause is measurable. `_eligible` drops a facet only when *no* candidate
+in the pool carries a value for it, and `CLARIFICATION_SEQUENCE` is
+`("feature", "material", "color")`. Across the 50,000-product official
+catalog:
+
+| Facet | Products populated | Rate |
+|---|---|---|
+| `feature` | 49,713 | 99.43% |
+| `material` | 29,047 | 58.09% |
+| `color` | 16,421 | 32.84% |
+
+Only 245 of 50,000 products have all three empty. `feature` is asked first
+and is present on essentially every product, so the gated and ungated lists
+almost never diverge, and on the dev split they never did.
+
+This does not contradict the unit tests. Those pin the mechanism against a
+fixture built so that `material` is unpopulated across the whole pool, and
+that fixture is what proves the code path works. The catalog's real
+retrieved pools do not reproduce that condition. The honest reading is that
+`V` is a correct implementation of a change with no measurable effect on
+this dataset, not an improvement — a passing gate here is a tie, not a win.
+
+### Recorded rows
+
+Two reportable rows were appended to `results.jsonl` (39 → 41), both at
+`547bdb1`: `P/dev` as the in-environment control and `V/dev` as the gated
+run. Wall time was 1583 s and 1370 s, dominated by the mandatory in-process
+rebuild of the 50,000-product embedding cache
+(`trusted_for_reporting` requires `rebuilt_in_process`).
+
+### Reproduction hazard found while setting this up
+
+A reportable run cannot be produced from the Windows working copy. With
+`core.autocrlf=true`, git rewrites `data/public_set.jsonl` to CRLF on
+checkout, so it hashes to `571359a8…` instead of the official
+`857259f7…` and `src/eval/runner.py` rejects it — while `git status` still
+reports the tree clean, because git normalizes line endings when comparing.
+The run therefore needs an LF-correct checkout, not merely a Linux kernel.
+Cloning into the WSL filesystem with `core.autocrlf=false` restores the
+official digest.
