@@ -25,3 +25,14 @@ editing that source file. Reportable runs pin its SHA-256 to
 `857259f7a438e6188ac63e18995b6ff4489bfcfc4a716a798b9a2aa0ee8f7579`,
 evaluate private immutable input snapshots, and rebuild dense vectors from the
 verified vendored model in-process.
+
+## Research-derived methods
+
+ShopLens's planned tri-state preference and catalog-aware dialogue-policy
+experiments are informed by Li et al.'s TRACER method. They are independent
+implementations against the competition's immutable Amazon Reviews 2023
+catalog; no upstream TRACER source files or WoS dataset records are part of the
+data pipeline. See the
+[Wizard of Shopping source audit](wizard-of-shopping-integration.md) for the
+canonical citation, license evidence, adoption decisions, and future generated
+artifact metadata requirements.

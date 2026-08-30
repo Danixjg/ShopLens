@@ -26,7 +26,9 @@ def test_integration_record_cites_the_primary_paper() -> None:
         "CC BY 4.0",
     }
 
-    assert not required.difference(text)
+    missing = {value for value in required if value not in text}
+
+    assert not missing
 
 
 def test_source_audit_blocks_copying_artifacts_without_clear_terms() -> None:
@@ -38,7 +40,9 @@ def test_source_audit_blocks_copying_artifacts_without_clear_terms() -> None:
         "wos dataset | do not import",
     }
 
-    assert not required.difference(text)
+    missing = {value for value in required if value not in text}
+
+    assert not missing
 
 
 def test_adoption_matrix_has_adopt_evaluate_and_defer_decisions() -> None:
@@ -51,7 +55,9 @@ def test_adoption_matrix_has_adopt_evaluate_and_defer_decisions() -> None:
         "information-gain",
     }
 
-    assert not required.difference(text)
+    missing = {value for value in required if value not in text}
+
+    assert not missing
 
 
 def test_adoption_boundary_preserves_shoplens_contracts() -> None:
@@ -64,7 +70,9 @@ def test_adoption_boundary_preserves_shoplens_contracts() -> None:
         "dev-only",
     }
 
-    assert not required.difference(text)
+    missing = {value for value in required if value not in text}
+
+    assert not missing
 
 
 def test_repository_entry_points_link_the_integration_record() -> None:

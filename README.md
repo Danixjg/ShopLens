@@ -6,6 +6,13 @@ the same turn that it returns up to ten ranked products, remembers disclosed
 constraints, and removes superseded preferences when the shopper changes
 their mind.
 
+The planned extension of its preference and clarification policy is informed
+by Li et al.'s TRACER method from *Wizard of Shopping* (ACL 2025). ShopLens is
+an independent implementation and currently contains neither upstream TRACER
+code nor Wizard of Shopping dataset records. The
+[source audit and adoption boundary](docs/wizard-of-shopping-integration.md)
+records the full citation, license evidence, and adopt/evaluate/defer decisions.
+
 The system implements the organizer's `Agent.reset(...)` and
 `Agent.respond(...)` interface. It does not modify the catalog or evaluator,
 call a paid API, or require network access during baseline scoring.
