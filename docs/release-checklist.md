@@ -53,6 +53,19 @@
       International (CC BY 4.0).
 - [x] The local research transcript is ignored, untracked, and therefore absent
       from the Git-derived release bundle; no upstream code or data is bundled.
+- [x] Full research credit is present: Jingheng Ye, Yong Jiang, Xiaobin Wang,
+      Yinghui Li, Yangning Li, Hai-Tao Zheng, Pengjun Xie, and Fei Huang. 2024.
+      *ProductAgent: Benchmarking Conversational Product Search Agent with
+      Asking Clarification Questions*. arXiv:2407.00942 [cs.IR]; DOI
+      `10.48550/arXiv.2407.00942`; abstract page
+      `https://arxiv.org/abs/2407.00942`.
+- [x] The ProductAgent preprint is recorded as carrying the arXiv
+      non-exclusive distribution license 1.0, which grants no third-party
+      redistribution or derivative right. No copy or local conversion of it is
+      tracked, and `docs/ProductAgent.md` is Git-ignored and untracked.
+- [x] No ProductAgent-reported metric appears on a ShopLens results surface;
+      those values were measured on AliMe KG with an LLM agent and belong only
+      to `docs/productagent-integration.md`.
 
 ## Final package
 

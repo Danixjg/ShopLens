@@ -10,6 +10,8 @@ results.json
 data/catalog.jsonl
 data/catalog.embeddings.npz
 data/releases/
+# Compressed release assets are downloaded per README, never committed.
+data/*.gz
 # Organizer-only code, private evaluation data, manifests, and build reports.
 organizer/
 secure/
@@ -26,5 +28,6 @@ tests/test_organizer_pipeline.py
 docs/*.pdf
 docs/Learning_to_Ask_Good_Questions.md
 docs/Wizard_of_Shopping.md
+docs/ProductAgent.md
 # WSL alternate-data-stream artifacts from downloaded files.
 *:Zone.Identifier

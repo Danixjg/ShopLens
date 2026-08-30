@@ -38,7 +38,7 @@ def _is_tracked(relative_path: str) -> bool:
 
 
 def test_integration_record_cites_the_primary_paper() -> None:
-    text = _read(INTEGRATION_RECORD)
+    text = _normalized_markdown(INTEGRATION_RECORD)
     required = {
         "Jingheng Ye",
         "Yong Jiang",
@@ -60,7 +60,7 @@ def test_integration_record_cites_the_primary_paper() -> None:
 
 
 def test_source_audit_records_the_arxiv_license_grant() -> None:
-    text = _read(INTEGRATION_RECORD)
+    text = _normalized_markdown(INTEGRATION_RECORD)
     required = {
         "http://arxiv.org/licenses/nonexclusive-distrib/1.0/",
         "perpetual, non-exclusive license to distribute",

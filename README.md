@@ -362,6 +362,25 @@ publication: [ACL Anthology](https://aclanthology.org/P18-1255/). The paper is
 licensed under Creative Commons Attribution 4.0 International (CC BY 4.0). See
 [Research attribution](docs/research-attribution.md) for the adoption boundary.
 
+ShopLens's clarification-quality guards and its rule for reporting
+membership-preserving rerank ablations are informed by:
+
+> Jingheng Ye, Yong Jiang, Xiaobin Wang, Yinghui Li, Yangning Li, Hai-Tao
+> Zheng, Pengjun Xie, and Fei Huang. 2024. *ProductAgent: Benchmarking
+> Conversational Product Search Agent with Asking Clarification Questions*.
+> arXiv:2407.00942 [cs.IR].
+
+arXiv: [2407.00942](https://arxiv.org/abs/2407.00942). DOI:
+[10.48550/arXiv.2407.00942](https://doi.org/10.48550/arXiv.2407.00942). The
+preprint carries the arXiv non-exclusive distribution license 1.0, which
+grants no third-party redistribution or derivative right, so no copy or
+conversion of it is tracked in this repository. ShopLens contains no
+ProductAgent code and no AliMe KG records, and it runs no language model, SQL
+statistics tool, or user simulator; the adopted ideas are implemented
+independently. See
+[ProductAgent source audit](docs/productagent-integration.md) for the license
+finding and the adoption boundary.
+
 Submission working documents: [Devpost draft](docs/devpost-draft.md),
 [demo script](docs/demo-script.md), and
 [release checklist](docs/release-checklist.md).
