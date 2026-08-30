@@ -83,14 +83,31 @@ Before running config `U` on dev, the retention rule is frozen as follows:
 Only if every gate passes may the already-frozen commit be opened on holdout
 once. A failed dev gate rejects config `U` without a holdout run.
 
+## Evaluation outcome
+
+Config `U` was evaluated once on dev from clean commit `87834f4` with the
+locked dense environment. The reportable result recorded:
+
+- HR@10 `0.941667`, equal to P;
+- MRR `0.641323`, versus P's `0.639239`;
+- MTTC `3.175000`, versus P's `3.133333`;
+- TechnicalScore `0.819730`, versus the required P threshold `0.819939`;
+- TechnicalScore delta `-0.000209`; and
+- zero agent exceptions, evaluator exceptions, or invalid responses.
+
+Scenario TechnicalScore deltas versus P were Boundary `-0.003333`, Browsing
+`-0.001667`, Buying `-0.001146`, and Intent Override `+0.007222`, all inside
+the `-0.02` scenario guard. The primary TechnicalScore gate nevertheless
+failed, so config `U` was rejected and holdout was not opened. No parameters or
+implementation were changed after inspecting dev.
+
 ## Coverage and known gaps
 
 The repository does not install `coverage.py`, so coverage used Python's
 standard-library `trace` runner and report files were written under `/tmp`, not
-the repository. Config `U` has not yet been evaluated against labeled dev or
-holdout sessions at the point this pre-registration was written. The policy is
-an independent deterministic adaptation; it does not reproduce the paper's
-neural answer model or use its dataset.
+the repository. Config `U` was rejected on dev, so no holdout evidence exists
+by design. The policy is an independent deterministic adaptation; it does not
+reproduce the paper's neural answer model or use its dataset.
 
 ## Merge evidence
 

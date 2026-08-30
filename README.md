@@ -270,6 +270,13 @@ uses baseline A. Hybrid configurations require the optional dense install.
 | U | P plus deterministic expected-question-value clarification |
 | Z | Clarification off, diagnostic only |
 
+U is a documented research ablation, not a retained configuration. Its clean
+dev run at `87834f4` kept HR@10 at `0.941667` and raised MRR from P's
+`0.639239` to `0.641323`, but MTTC moved from `3.133333` to `3.175000`.
+TechnicalScore therefore fell from `0.819939` to `0.819730` (`-0.000209`),
+missing the pre-registered retention gate. U was rejected without opening
+holdout; the reportable dev record remains in `results.jsonl`.
+
 Q uses only the immutable organizer catalog. For each member of P's frozen
 Top-10 it log-scales `rating_number` against the catalog maximum and adds
 `0.15 * popularity / 61` to the existing P score. It then reorders those same

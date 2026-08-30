@@ -85,6 +85,14 @@ cost. Boundary HR@10 moved from the historical F `0.166667/0.25` to P
 or held in aggregate. Configs G and H are not claimed because no plan-specified
 offline cross-encoder or LLM provider exists.
 
+The research-derived U ablation replaced only P's information-gain question
+policy with deterministic expected-question-value scoring. On a clean dev run
+it preserved HR@10 at `0.941667` and increased MRR to `0.641323`, but MTTC
+worsened to `3.175000`; TechnicalScore was `0.819730`, just below P's
+pre-registered `0.819939` threshold. We therefore rejected U and did not open
+holdout. This negative result is retained because it separates an appealing
+research framing from a measured competition improvement.
+
 ## Limitations and future work
 
 - Boundary remains the smallest and noisiest scenario bucket (six dev and four
