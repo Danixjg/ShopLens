@@ -332,11 +332,12 @@ class _EvaluatorAgentProxy:
         started = time.perf_counter()
         try:
             response = self.agent.respond(session_id, user_message, turn, top_k)
+            valid = self._valid_response(response, top_k)
         except Exception:
             self.raised_exception_count += 1
             raise
         self.turn_latency_ms.append((time.perf_counter() - started) * 1000.0)
-        if not self._valid_response(response, top_k):
+        if not valid:
             self.invalid_response_count += 1
         return response
 
