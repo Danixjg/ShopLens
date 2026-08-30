@@ -18,6 +18,8 @@
 - [ ] Clean reportable dev and holdout runs exist for retained config P.
 - [ ] Config Q has dev evidence, exact P/Q membership parity, and an explicitly
       exploratory holdout result before it replaces P as the retained config.
+- [ ] Config U satisfies its pre-registered dev gate before any single holdout
+      run; a dev rejection is documented without opening holdout.
 - [x] Historical canonical `be4017aa` rows record a clean Git SHA and `reportable: true`.
 - [ ] New canonical results include config flags, effective capabilities, guarded
       exception count, dependency/model versions, catalog/dataset digests,
@@ -33,6 +35,8 @@
 - [ ] Tools, libraries, APIs, datasets, cost, limitations, and exact team
       contributions are disclosed.
 - [ ] No third-party trademarks or copyrighted media appear without permission.
+- [ ] The Rao–Daumé research citation and independent-adaptation boundary are
+      present; the ignored local transcript is absent from the release bundle.
 
 ## Final package
 

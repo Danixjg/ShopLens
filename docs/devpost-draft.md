@@ -24,6 +24,11 @@ Buying-versus-Browsing routing rather than destructive filters.
 - Hard constraints apply bounded per-attribute evidence, never filters.
 - Candidate-pool overload selects the facet with the highest normalized
   multiclass information gain, excluding declined attributes.
+- Experimental config U instead ranks eligible attributes by deterministic
+  expected Top-K utility over possible catalog-facet answers. This is an
+  independent adaptation of Rao and Daumé III's EVPI framing, not a port of
+  their neural model; the canonical citation is in
+  `docs/research-attribution.md`.
 - A local contiguous-phrase rarity bonus reranks only the frozen Top 10, so it
   can improve MRR without changing Hit Rate membership.
 
@@ -87,6 +92,8 @@ offline cross-encoder or LLM provider exists.
 - The deterministic parser is tailored to controlled simulator language, not
   arbitrary noisy commerce conversations.
 - Sparse catalog metadata makes some constraints, especially color, unreliable.
+- The expected-question-value experiment uses catalog facets as a target-free
+  proxy for possible answers; it cannot predict every free-form shopper reply.
 - Q favors established products over niche or newly listed products, and the
   public target construction may amplify that popularity bias.
 - The optional cross-encoder and LLM-ranking experiments are not claimed until
