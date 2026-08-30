@@ -38,6 +38,7 @@ class RunConfig:
     profile_rerank: bool = False
     facet_population_gate: bool = False
     exclude_shown: bool = False
+    ordered_rerank: bool = False
     popularity_rerank_weight: float = 0.0
     profile_rerank_weight: float = 0.0
 
@@ -150,6 +151,23 @@ CONFIGS: dict[str, RunConfig] = {
         popularity_rerank=True,
         popularity_rerank_weight=POPULARITY_RERANK_WEIGHT,
         exclude_shown=True,
+    ),
+    # N with the phrase reranker replaced by disclosure-order ranking, so a
+    # candidate satisfying more of what the shopper said always outranks one
+    # satisfying fewer, rather than more inverse-frequency evidence winning.
+    "O": replace(
+        _A,
+        name="O",
+        retrieval_mode="hybrid",
+        constraint_scoring=True,
+        session_memory=True,
+        clarification="info_gain",
+        dynamic_weights=True,
+        phrase_rerank=True,
+        popularity_rerank=True,
+        popularity_rerank_weight=POPULARITY_RERANK_WEIGHT,
+        exclude_shown=True,
+        ordered_rerank=True,
     ),
     "Z": replace(_A, name="Z", clarification="off"),
 }

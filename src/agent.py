@@ -11,6 +11,7 @@ from src.contracts.state import SessionState, UserProfile
 from src.parsing import TurnParser
 from src.policy import ClarificationPolicy
 from src.retrieval import HybridRetriever, build_retriever
+from src.scoring.ordered import OrderedConstraintReranker
 from src.scoring import (
     ConstraintScorer,
     DynamicWeightScorer,
@@ -51,6 +52,9 @@ class Agent:
             else None
         )
         self.phrase_reranker = PhraseReranker(self.catalog) if self.config.phrase_rerank else None
+        self.ordered_reranker = (
+            OrderedConstraintReranker(self.catalog) if self.config.ordered_rerank else None
+        )
         self.popularity_reranker = (
             PopularityReranker(self.catalog, self.config.popularity_rerank_weight)
             if self.config.popularity_rerank
@@ -179,7 +183,11 @@ class Agent:
         candidates = sorted(candidates, key=lambda item: (-item.score, item.asin))[:safe_k]
         if self.reranker is not None:
             candidates = self.reranker.rerank(query, candidates)
-        if self.phrase_reranker is not None:
+        if self.ordered_reranker is not None:
+            # Replaces the phrase reranker rather than stacking on it: both
+            # order the same frozen set from the same disclosures.
+            candidates = self.ordered_reranker.rerank(state, candidates)
+        elif self.phrase_reranker is not None:
             candidates = self.phrase_reranker.rerank(state, candidates, pool)
         if self.popularity_reranker is not None:
             candidates = self.popularity_reranker.rerank(candidates)
