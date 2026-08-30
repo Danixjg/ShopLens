@@ -164,3 +164,75 @@ turn-count cost `R` carries alone, so efficiency dips marginally. MRR gains
 Both gates passed, so the single holdout opening is permitted. Per the label
 fixed in advance, any `T` holdout row is **exploratory**, not a clean
 untouched holdout, because `T` contains `Q`'s popularity prior.
+
+## Holdout outcome, recorded 2026-08-30
+
+The single permitted holdout opening was spent once, as
+`python3 -m src.eval.runner --config T --split holdout` from clean commit
+`fae2970` in the same reference environment (lock `bcc0ef81…`, 0 mismatches,
+catalog `da979b05…`, public set `857259f7…`). Accepted as `"reportable": true`
+with no reportability reasons and zero exceptions of every kind.
+
+### T is the strongest configuration on both splits
+
+| Config | Dev | Holdout |
+|---|---:|---:|
+| `P` (currently retained) | 0.819939 | 0.843958 |
+| `R` | 0.823304 | 0.846396 |
+| `S` | 0.823050 | 0.846896 |
+| `Q` | 0.862083 | 0.880321 (exploratory) |
+| **`T`** | **0.866774** | **0.891630 (exploratory)** |
+
+Against `P` on holdout, every scenario improves and none regresses:
+`boundary` +0.034464, `browsing` +0.031224, `buying` +0.056771,
+`intent_override` +0.071667, with HR@10 held at `0.975000`.
+
+The `boundary` figure of `0.590714` looks low in isolation but is not a
+regression: `P` scores `0.556250` on the same four holdout sessions. That
+scenario is simply hard, and `n=4` makes it the noisiest cell in the table.
+
+### The composition finding replicates
+
+The margin over the best single component grew rather than shrank:
+
+| | `T` − `Q` |
+|---|---:|
+| dev | +0.004691 |
+| holdout | +0.011309 |
+
+And it concentrates in the same place on both splits:
+
+| Scenario | n | `T` − `Q` (holdout) |
+|---|---:|---:|
+| `browsing` | 32 | **+0.000000** |
+| `buying` | 32 | +0.010458 |
+| `boundary` | 4 | +0.012500 |
+| `intent_override` | 12 | **+0.043333** |
+
+`browsing` is flat to six decimal places, exactly as on dev. The composition
+gain is `intent_override`, which is precisely what `R`'s symmetric intent
+routing targets. Two independent splits agreeing on both the location and the
+direction of the effect makes this a structural result rather than noise:
+`Q`'s popularity prior supplies the bulk of the improvement, and `R` adds a
+further gain confined to intent-override sessions.
+
+### Retention: the decision this evidence does *not* make on its own
+
+`T` cleared every pre-registered criterion and is the best measured
+configuration on both splits. But its holdout row is **exploratory**, by the
+label fixed in this document before any run: `T` contains `Q`'s popularity
+prior, whose hypothesis followed an aggregate review of target rating counts
+across all 200 public sessions. `T`'s holdout is therefore not a clean
+untouched result and may never be presented as one.
+
+That constrains, but does not settle, promotion. Retaining `T` over `P` means
+the headline rests on an exploratory holdout; keeping `P` means the submission
+reports a retained configuration that its own evidence shows is not the
+strongest. Both are defensible and the choice is the maintainer's. What is not
+defensible is presenting `T`'s `0.891630` without the exploratory caveat
+attached.
+
+Note also that `R` and `S` remain clean, non-exploratory candidates: both beat
+`P` on both splits with untouched holdout rows, `S` highest at `0.846896`. A
+conservative promotion path that avoids the exploratory label entirely exists
+and does not depend on `T`.
