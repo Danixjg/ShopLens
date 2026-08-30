@@ -15,10 +15,17 @@
 
 - [ ] A clean install reproduces config A without optional dependencies.
 - [ ] The locked dense environment reproduces configs B–H, P, and Q fully offline.
-- [ ] Clean reportable dev and holdout runs exist for retained config P.
+- [ ] Clean reportable dev and holdout runs exist for baseline P and for the
+      submission config T.
 - [x] Config Q has clean reportable dev evidence at `1b55d92`, exact P/Q
       membership parity, and an explicitly exploratory holdout result at
-      `5d5a486`; it has not replaced P as the retained config.
+      `5d5a486`.
+- [x] Config T is the submission configuration, with a dev row at `0371a54`
+      and an exploratory holdout row at `fae2970`. Its composition gate was
+      frozen before the run and required it to beat the best single component.
+- [x] Configs R and S remain the clean-holdout alternatives to T, each beating
+      P on both splits with untouched holdout rows, and both are published so
+      the submission does not report only its strongest number.
 - [x] Config U was rejected by its pre-registered dev gate and documented;
       holdout was not opened.
 - [x] Config U's clean `87834f4` dev record reports HR@10 `0.941667`, MRR
