@@ -327,6 +327,8 @@ and degrade to BM25 when it is absent.
 | W | T with the dense encoder indexing title, categories and features only |
 | X | T plus suppression of a preference the shopper replaced on override |
 | Y | T with reranking applied to the top 50 before truncation, so it can change Top-10 membership |
+| N | Q plus no-repeat recommendations: an asin already offered and scored is withheld from later turns, and an intent override clears that memory |
+| O | N with disclosure-order ranking replacing phrase-rarity reranking inside the frozen Top-10 |
 | Z | Clarification off, diagnostic only |
 
 U is a documented research ablation, not a retained configuration. Its clean

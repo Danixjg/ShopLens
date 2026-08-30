@@ -36,7 +36,7 @@ class ConstraintScorer:
         hard_terms: dict[str, list[frozenset[str]]] = defaultdict(list)
         soft_terms: dict[str, list[frozenset[str]]] = defaultdict(list)
         exclude_terms: dict[str, list[frozenset[str]]] = defaultdict(list)
-        for attribute, value in query.exclude:
+        for attribute, value in query.exclude_values:
             exclude_terms[attribute].append(frozenset(terms(_constraint_value(attribute, value))))
         for attribute, value in query.hard:
             hard_terms[attribute].append(frozenset(terms(_constraint_value(attribute, value))))

@@ -29,7 +29,8 @@ def build_retrieval_query(
         text=" ".join(part for part in parts if part).strip(),
         hard=hard,
         soft=soft,
-        exclude=exclude,
+        exclude_values=exclude,
         category=state.category or None,
         turn_index=max(1, state.turn_index),
+        exclude=frozenset(state.shown_asins),
     )

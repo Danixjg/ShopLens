@@ -51,14 +51,14 @@ def test_query_carries_the_superseded_value_as_an_exclusion() -> None:
 
     query = build_retrieval_query(state, exclude_superseded=True)
 
-    assert query.exclude == (("material", "leather"),)
+    assert query.exclude_values == (("material", "leather"),)
 
 
 def test_baseline_query_leaves_exclusions_empty() -> None:
     """T must be untouched, so the seam stays inert unless the flag is on."""
     state = SessionState(slots=[_slot("leather", active=False, superseded=True)], turn_index=3)
 
-    assert build_retrieval_query(state).exclude == ()
+    assert build_retrieval_query(state).exclude_values == ()
 
 
 def test_a_superseded_slot_never_returns_to_the_positive_query() -> None:
@@ -73,7 +73,7 @@ def test_a_superseded_slot_never_returns_to_the_positive_query() -> None:
 
 def test_excluded_value_penalises_only_the_matching_candidate(two_material_catalog: Catalog) -> None:
     scorer = ConstraintScorer(two_material_catalog)
-    query = RetrievalQuery(text="boot", exclude=(("material", "leather"),), turn_index=1)
+    query = RetrievalQuery(text="boot", exclude_values=(("material", "leather"),), turn_index=1)
     candidates = [Candidate("LEATHER", 1.0), Candidate("CANVAS", 1.0)]
 
     scored = {item.asin: item.score for item in scorer.score(candidates, query)}
@@ -84,7 +84,7 @@ def test_excluded_value_penalises_only_the_matching_candidate(two_material_catal
 
 def test_exclusion_records_its_own_scoring_component(two_material_catalog: Catalog) -> None:
     scorer = ConstraintScorer(two_material_catalog)
-    query = RetrievalQuery(text="boot", exclude=(("material", "leather"),), turn_index=1)
+    query = RetrievalQuery(text="boot", exclude_values=(("material", "leather"),), turn_index=1)
 
     scored = {item.asin: item.components for item in scorer.score([Candidate("LEATHER", 1.0)], query)}
 
@@ -94,8 +94,8 @@ def test_exclusion_records_its_own_scoring_component(two_material_catalog: Catal
 def test_exclusion_decays_with_the_turn_like_every_soft_signal(two_material_catalog: Catalog) -> None:
     """Mirrors the existing soft_weight decay rather than adding a new constant."""
     scorer = ConstraintScorer(two_material_catalog)
-    early = RetrievalQuery(text="boot", exclude=(("material", "leather"),), turn_index=1)
-    late = RetrievalQuery(text="boot", exclude=(("material", "leather"),), turn_index=9)
+    early = RetrievalQuery(text="boot", exclude_values=(("material", "leather"),), turn_index=1)
+    late = RetrievalQuery(text="boot", exclude_values=(("material", "leather"),), turn_index=9)
 
     early_penalty = scorer.score([Candidate("LEATHER", 1.0)], early)[0].components["excluded_material"]
     late_penalty = scorer.score([Candidate("LEATHER", 1.0)], late)[0].components["excluded_material"]
@@ -122,7 +122,7 @@ def test_a_declined_question_is_not_an_unwanted_value() -> None:
     state = SessionState(slots=[_slot("leather", active=True)], turn_index=2)
     state.declined_attributes.add("material")
 
-    assert build_retrieval_query(state, exclude_superseded=True).exclude == ()
+    assert build_retrieval_query(state, exclude_superseded=True).exclude_values == ()
 
 
 def test_config_x_is_t_with_only_the_negative_preference_flag_changed() -> None:
