@@ -86,6 +86,24 @@ CONFIGS: dict[str, RunConfig] = {
         profile_rerank=True,
         profile_rerank_weight=PROFILE_RERANK_WEIGHT,
     ),
+    # Every component below independently passed the dev + holdout + per-scenario
+    # retention gate against P. T measures whether they compose; it is retained
+    # only if the combination also clears that gate.
+    "T": replace(
+        _A,
+        name="T",
+        retrieval_mode="hybrid",
+        constraint_scoring=True,
+        session_memory=True,
+        clarification="info_gain",
+        dynamic_weights=True,
+        phrase_rerank=True,
+        symmetric_intent_routing=True,
+        profile_rerank=True,
+        profile_rerank_weight=PROFILE_RERANK_WEIGHT,
+        popularity_rerank=True,
+        popularity_rerank_weight=POPULARITY_RERANK_WEIGHT,
+    ),
     "Z": replace(_A, name="Z", clarification="off"),
 }
 

@@ -33,7 +33,12 @@ from src.parsing import OVERRIDE_MARKER, TurnParser
 from src.policy import ClarificationPolicy
 from src.retrieval import HybridRetriever
 from src.retrieval.dense import model_tree_sha256
-from src.scoring import ConstraintScorer, DynamicWeightScorer, ProfileAffinityReranker
+from src.scoring import (
+    ConstraintScorer,
+    DynamicWeightScorer,
+    PopularityReranker,
+    ProfileAffinityReranker,
+)
 from src.state import apply_parsed_turn, build_retrieval_query
 from starter.agent import Agent as EvaluatorAgent
 
@@ -72,7 +77,7 @@ def test_environment_can_select_hybrid_config(
 
 
 def test_ablation_matrix_has_exact_names() -> None:
-    assert set(CONFIGS) == set("ABCDEFGHPQRSZ")
+    assert set(CONFIGS) == set("ABCDEFGHPQRSTZ")
 
 
 def test_config_z_is_the_only_no_clarification_diagnostic() -> None:
@@ -230,6 +235,37 @@ def test_config_s_is_p_plus_within_session_profile_affinity() -> None:
         name="S",
         profile_rerank=True,
         profile_rerank_weight=PROFILE_RERANK_WEIGHT,
+    )
+
+
+def test_popularity_rerank_preserves_frozen_membership(catalog_path: Path) -> None:
+    """Findings 14 and 21: Q's prior is an ordering aid inside frozen Top-K and
+    must never add, remove, or resurrect a product."""
+    reranker = PopularityReranker(Catalog(catalog_path), weight=0.15)
+    frozen = [Candidate("B", 1.0), Candidate("A", 1.0)]
+    result = reranker.rerank(frozen)
+    assert {item.asin for item in result} == {"A", "B"}
+    assert len(result) == len(frozen)
+
+
+def test_popularity_bonus_cannot_outrank_disclosed_evidence(catalog_path: Path) -> None:
+    reranker = PopularityReranker(Catalog(catalog_path), weight=0.20)
+    assert [item.asin for item in reranker.rerank(
+        [Candidate("B", 1.01), Candidate("A", 1.0)],
+    )] == ["B", "A"]
+
+
+def test_config_t_is_the_union_of_the_retained_components() -> None:
+    t = CONFIGS["T"]
+    assert (t.symmetric_intent_routing, t.profile_rerank, t.popularity_rerank) == (True, True, True)
+    assert t == replace(
+        CONFIGS["P"],
+        name="T",
+        symmetric_intent_routing=CONFIGS["R"].symmetric_intent_routing,
+        profile_rerank=CONFIGS["S"].profile_rerank,
+        profile_rerank_weight=CONFIGS["S"].profile_rerank_weight,
+        popularity_rerank=CONFIGS["Q"].popularity_rerank,
+        popularity_rerank_weight=CONFIGS["Q"].popularity_rerank_weight,
     )
 
 
