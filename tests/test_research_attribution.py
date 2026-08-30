@@ -5,7 +5,9 @@ import re
 import subprocess
 from pathlib import Path
 
-from src.contracts.config import CONFIGS
+import pytest
+
+from src.contracts.config import CONFIGS, get_run_config
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -227,3 +229,25 @@ def test_readme_never_describes_a_measured_config_as_unrun() -> None:
     ]
 
     assert not stale
+
+
+def test_default_config_is_the_documented_submission_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A bare Agent must run the configuration the README calls the submission.
+
+    The official harness constructs the Agent without setting SHOPLENS_CONFIG,
+    so a default that disagrees with the documented submission configuration
+    would have the entry point graded on a different system than the one the
+    write-up reports. Binding the default to the README declaration keeps the
+    two from drifting apart in either direction.
+    """
+    monkeypatch.delenv("SHOPLENS_CONFIG", raising=False)
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+    declared = re.search(
+        r"\*\*Configuration ([A-Z]) is the submission configuration\.\*\*", readme
+    )
+
+    assert declared, "the README must name a submission configuration"
+    assert get_run_config().name == declared.group(1)
