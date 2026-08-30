@@ -267,6 +267,7 @@ uses baseline A. Hybrid configurations require the optional dense install.
 | H | Optional LLM rank experiment; offline path remains available |
 | P | F plus membership-preserving phrase-rarity reranking |
 | Q | P plus a bounded rating-count prior inside the frozen Top-10 |
+| U | P plus deterministic expected-question-value clarification |
 | Z | Clarification off, diagnostic only |
 
 Q uses only the immutable organizer catalog. For each member of P's frozen
@@ -333,6 +334,13 @@ submission freeze; no names are inferred where the repository contains none.
 The catalog and sessions derive from Amazon Reviews 2023 by McAuley Lab,
 UCSD. See [DATA_ATTRIBUTION.md](DATA_ATTRIBUTION.md) for the required citation
 and redistribution terms.
+
+## Research attribution
+
+The experimental expected-question-value clarification policy is an
+independent deterministic adaptation of the EVPI framing introduced by Sudha
+Rao and Hal Daumé III. See [Research attribution](docs/research-attribution.md)
+for the canonical citation, license, and adoption boundary.
 
 Submission working documents: [Devpost draft](docs/devpost-draft.md),
 [demo script](docs/demo-script.md), and

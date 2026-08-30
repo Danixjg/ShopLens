@@ -77,7 +77,7 @@ def test_environment_can_select_hybrid_config(
 
 
 def test_ablation_matrix_has_exact_names() -> None:
-    assert set(CONFIGS) == set("ABCDEFGHPQRSTZ")
+    assert set(CONFIGS) == set("ABCDEFGHPQRSTUZ")
 
 
 def test_config_z_is_the_only_no_clarification_diagnostic() -> None:

@@ -6,7 +6,7 @@ from typing import Literal
 
 
 RetrievalMode = Literal["bm25", "dense", "hybrid"]
-ClarificationMode = Literal["off", "empty_result_only", "info_gain"]
+ClarificationMode = Literal["off", "empty_result_only", "info_gain", "expected_value"]
 RerankerMode = Literal["none", "local_cross_encoder"]
 
 HIT_RATE_WEIGHT = 0.50
@@ -103,6 +103,19 @@ CONFIGS: dict[str, RunConfig] = {
         profile_rerank_weight=PROFILE_RERANK_WEIGHT,
         popularity_rerank=True,
         popularity_rerank_weight=POPULARITY_RERANK_WEIGHT,
+    ),
+    # Research-derived ablation: P with only the clarification question-value
+    # policy changed. It remains experimental until its dev gate is frozen and
+    # a single holdout run is recorded.
+    "U": replace(
+        _A,
+        name="U",
+        retrieval_mode="hybrid",
+        constraint_scoring=True,
+        session_memory=True,
+        clarification="expected_value",
+        dynamic_weights=True,
+        phrase_rerank=True,
     ),
     "Z": replace(_A, name="Z", clarification="off"),
 }

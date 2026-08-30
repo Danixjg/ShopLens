@@ -10,6 +10,8 @@ from src.contracts.response import AskAttribute
 from src.contracts.retrieval import Candidate
 from src.contracts.state import SessionState
 
+from .question_value import score_question_values
+
 
 CLARIFICATION_SEQUENCE: tuple[AskAttribute, ...] = ("feature", "material", "color")
 
@@ -127,8 +129,49 @@ class ClarificationPolicy:
         # from the deterministic next eligible targeted facet.
         return unasked[0] if over_general and unasked else None
 
+    def _expected_value_choice(
+        self,
+        state: SessionState,
+        candidates: list[Candidate],
+        over_general: bool,
+        recommendation_limit: int,
+    ) -> AskAttribute | None:
+        unasked = [
+            attribute for attribute in CLARIFICATION_SEQUENCE
+            if attribute not in state.asked_attributes
+            and attribute not in state.declined_attributes
+        ]
+        if self.catalog is not None and unasked:
+            values = score_question_values(
+                self.catalog,
+                self._pool(candidates),
+                active_values={
+                    attribute: self._active_values(state, attribute)
+                    for attribute in CLARIFICATION_SEQUENCE
+                },
+                recommendation_limit=recommendation_limit,
+            )
+            value, _, attribute = max(
+                (values[name], -index, name)
+                for index, name in enumerate(unasked)
+            )
+            if value > 0.0:
+                return attribute
+        if not over_general and unasked:
+            return unasked[0]
+        if (
+            "other" not in state.asked_attributes
+            and "other" not in state.declined_attributes
+        ):
+            return "other"
+        return unasked[0] if over_general and unasked else None
+
     def choose(
-        self, state: SessionState, candidates: list[Candidate], over_general: bool = True,
+        self,
+        state: SessionState,
+        candidates: list[Candidate],
+        over_general: bool = True,
+        recommendation_limit: int = 10,
     ) -> AskAttribute | None:
         if self.config.clarification == "off":
             return None
@@ -136,6 +179,13 @@ class ClarificationPolicy:
         # afterwards, so the policy must keep asking about everything else.
         if self.config.clarification == "info_gain":
             return self._information_choice(state, candidates, over_general)
+        if self.config.clarification == "expected_value":
+            return self._expected_value_choice(
+                state,
+                candidates,
+                over_general,
+                recommendation_limit,
+            )
         return self._fixed_choice(state)
 
     @staticmethod
