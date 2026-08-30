@@ -67,6 +67,14 @@
       those values were measured on AliMe KG with an LLM agent and belong only
       to `docs/productagent-integration.md`.
 
+- [x] Wizard of Shopping / TRACER credit and the adoption boundary are
+      recorded in `docs/wizard-of-shopping-integration.md`, and the local
+      conversion `docs/Wizard_of_Shopping.md` is Git-ignored and untracked.
+- [x] Both ideas that audit governs were measured under pre-registered dev
+      gates and neither was retained: U was rejected at `0.819730` against
+      P's `0.819939`, and V tied P exactly at `0.819939`. No WoS-reported
+      metric appears on a ShopLens results surface.
+
 ## Final package
 
 - [ ] Network requirements and offline fallback are explicit.

@@ -20,7 +20,9 @@ Computational Linguistics.
 - Authors' reference repository: https://github.com/jacklxc/Wizard-of-Shopping
 - License for the ACL 2025 paper: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
 
-The local [Codex-oriented conversion](Wizard_of_Shopping.md) was made from
+The local Codex-oriented conversion (`docs/Wizard_of_Shopping.md`, which is
+Git-ignored and never redistributed, so it is absent from a fresh clone) was
+made from
 arXiv:2502.00969v1 before the final ACL record was available. ShopLens cites
 the final ACL publication as canonical and identifies the local restructuring
 and technical index as changes to the source presentation. CC BY 4.0 requires
