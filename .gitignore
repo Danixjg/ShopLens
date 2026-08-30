@@ -21,3 +21,6 @@ docs/participant_release_checklist.md
 tests/test_5core_builder.py
 tests/test_organizer_pipeline.py
 *.log
+# Third-party reference papers read locally. They are not ours to redistribute
+# and must never enter the submission bundle.
+docs/*.pdf
