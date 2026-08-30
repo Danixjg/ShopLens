@@ -36,12 +36,16 @@ class TurnParser:
     def parse(self, user_message: str, turn: int) -> ParsedTurn:
         message = str(user_message).strip()
         category = _category_from_initial(message)
+        intent: str | None
         if _BUYING_MARKER in message:
             intent = "buying"
         elif category is not None and _EXPLORE_MARKER not in message:
             intent = "intent_override"
-        else:
+        elif category is not None:
             intent = "browsing"
+        else:
+            # A clarification reply discloses constraints, not intent.
+            intent = None
         hard: list[tuple[str, str]] = []
         soft: list[tuple[str, str]] = []
         is_override = OVERRIDE_MARKER in message

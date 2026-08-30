@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections import Counter
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -10,10 +11,15 @@ import pytest
 import src.agent as agent_module
 from agent import Agent as SubmissionAgent
 from src.catalog import OFFICIAL_CATALOG_SHA256, Catalog
-from src.contracts.config import CONFIGS, get_run_config
+from src.contracts.config import CONFIGS, PROFILE_RERANK_WEIGHT, get_run_config
 from src.contracts.response import AgentReply, Recommendation, Usage
-from src.contracts.retrieval import Candidate, RetrievalQuery
-from src.contracts.state import SessionState
+from src.contracts.retrieval import (
+    BUYING_PRECISION_INTENTS,
+    Candidate,
+    HARD_CONSTRAINT_INTENTS,
+    RetrievalQuery,
+)
+from src.contracts.state import SessionState, UserProfile
 from src.eval.runner import (
     REFERENCE_REQUIREMENTS,
     _capability_status,
@@ -27,7 +33,7 @@ from src.parsing import OVERRIDE_MARKER, TurnParser
 from src.policy import ClarificationPolicy
 from src.retrieval import HybridRetriever
 from src.retrieval.dense import model_tree_sha256
-from src.scoring import ConstraintScorer, DynamicWeightScorer
+from src.scoring import ConstraintScorer, DynamicWeightScorer, ProfileAffinityReranker
 from src.state import apply_parsed_turn, build_retrieval_query
 from starter.agent import Agent as EvaluatorAgent
 
@@ -66,7 +72,7 @@ def test_environment_can_select_hybrid_config(
 
 
 def test_ablation_matrix_has_exact_names() -> None:
-    assert set(CONFIGS) == set("ABCDEFGHPQZ")
+    assert set(CONFIGS) == set("ABCDEFGHPQRSZ")
 
 
 def test_config_z_is_the_only_no_clarification_diagnostic() -> None:
@@ -179,6 +185,67 @@ def test_runner_rejects_unavailable_requested_capability(catalog_path: Path) -> 
     assert "requested local cross-encoder is unavailable" in reasons
 
 
+def test_profile_rerank_cannot_change_membership(catalog_path: Path) -> None:
+    """Finding 10: within-session profile use is permitted only where it cannot
+    outrank disclosed constraints or alter which products are recommended."""
+    catalog = Catalog(catalog_path)
+    reranker = ProfileAffinityReranker(catalog, weight=0.05)
+    state = SessionState(user_profile=UserProfile.from_dict(
+        {"preference_tags": ["leather", "waterproof"]},
+    ))
+    candidates = [Candidate("B", 1.0), Candidate("A", 1.0), Candidate("C", 1.0)]
+    reranked = reranker.rerank(state, candidates)
+    assert sorted(item.asin for item in reranked) == ["A", "B", "C"]
+    # A matches both tags, so a tie the disclosed evidence left open now breaks
+    # toward the profile without any product entering or leaving the list.
+    assert reranked[0].asin == "A"
+
+
+def test_profile_rerank_is_inert_without_profile_tags(catalog_path: Path) -> None:
+    reranker = ProfileAffinityReranker(Catalog(catalog_path), weight=0.05)
+    candidates = [Candidate("B", 1.0), Candidate("A", 1.0)]
+    assert reranker.rerank(SessionState(), candidates) is candidates
+    empty = SessionState(user_profile=UserProfile.from_dict({}))
+    assert reranker.rerank(empty, candidates) is candidates
+
+
+def test_profile_bonus_stays_below_a_disclosed_constraint(catalog_path: Path) -> None:
+    reranker = ProfileAffinityReranker(Catalog(catalog_path), weight=0.05)
+    state = SessionState(user_profile=UserProfile.from_dict({"preference_tags": ["leather"]}))
+    # "A" matches the tag fully; "B" matches none. A hundredth of a point of
+    # retrieval or constraint evidence must still outrank a perfect tag match.
+    reranked = reranker.rerank(state, [Candidate("B", 1.01), Candidate("A", 1.0)])
+    assert [item.asin for item in reranked] == ["B", "A"]
+
+
+def test_profile_reranker_rejects_unlisted_weight(catalog_path: Path) -> None:
+    with pytest.raises(ValueError, match="profile rerank weight"):
+        ProfileAffinityReranker(Catalog(catalog_path), weight=0.5)
+
+
+def test_config_s_is_p_plus_within_session_profile_affinity() -> None:
+    assert CONFIGS["P"].profile_rerank is False
+    assert CONFIGS["S"] == replace(
+        CONFIGS["P"],
+        name="S",
+        profile_rerank=True,
+        profile_rerank_weight=PROFILE_RERANK_WEIGHT,
+    )
+
+
+def test_requested_llm_rank_can_never_be_reported(catalog_path: Path) -> None:
+    """Finding 9: no LLM ranking path ships, so H must fail the reportable gate
+    rather than presenting the unchanged offline ordering as an LLM result."""
+    agent = SubmissionAgent(catalog_path, config=CONFIGS["H"])
+    status, reasons = _capability_status(agent)
+    assert status["llm_rank"] == {"requested": True, "effective": False, "ready": False}
+    assert "requested LLM rank is not implemented" in reasons
+
+
+def test_shipped_configs_do_not_request_llm_rank() -> None:
+    assert [name for name, config in CONFIGS.items() if config.llm_rank] == ["H"]
+
+
 def test_agent_counts_guarded_response_failures(
     catalog_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -251,6 +318,96 @@ def test_clarification_reply_preserves_buying_route() -> None:
     reply = parser.parse("For that, what matters is: waterproof.", 2)
     apply_parsed_turn(state, reply, "reply", 2)
     assert state.intent == "buying"
+
+
+def test_clarification_reply_emits_no_intent_event() -> None:
+    """Finding 17: a disclosure or decline reply discloses constraints, not intent.
+
+    Emitting ``browsing`` here and relying on the state layer to discard it made
+    the parser's output semantically false. The event is now absent instead.
+    """
+    parser = TurnParser()
+    for message in (
+        "For that, what matters is: waterproof; leather.",
+        "I don't have an additional preference for material.",
+        "I don't have a preference for color; please use your judgment.",
+        "Those options are not quite right yet. Ask me about one specific attribute.",
+    ):
+        assert parser.parse(message, 2).intent is None, message
+
+
+def test_initial_turns_still_declare_intent() -> None:
+    parser = TurnParser()
+    assert parser.parse("I'm looking for Boots. A key requirement is: leather.", 1).intent == "buying"
+    assert parser.parse("I'm looking for Boots, but I'm still exploring.", 1).intent == "browsing"
+    assert parser.parse("I'm looking for Boots. Something warm.", 1).intent == "intent_override"
+    override = parser.parse(
+        "Actually, ignore my earlier preference. What I need is: suede.", 3,
+    )
+    assert override.intent == "intent_override"
+    assert override.is_override
+
+
+def test_clarification_reply_preserves_override_route() -> None:
+    """Finding 17: Intent Override persistence needs the same coverage as Buying."""
+    parser = TurnParser()
+    state = SessionState()
+    apply_parsed_turn(
+        state,
+        parser.parse("I'm looking for Boots, but I'm still exploring.", 1),
+        "first",
+        1,
+    )
+    assert state.intent == "browsing"
+    apply_parsed_turn(
+        state,
+        parser.parse("Actually, ignore my earlier preference. What I need is: suede.", 2),
+        "override",
+        2,
+    )
+    assert state.intent == "intent_override"
+    for turn, message in enumerate(
+        (
+            "For that, what matters is: waterproof.",
+            "I don't have an additional preference for color.",
+        ),
+        start=3,
+    ):
+        apply_parsed_turn(state, parser.parse(message, turn), message, turn)
+        assert state.intent == "intent_override"
+
+
+def test_symmetric_routing_flag_extends_precision_to_override() -> None:
+    """Findings 6 and 17: the retrieval and scoring high-intent sets must agree
+    by decision, not by accident. R is P with the two reconciled."""
+    assert CONFIGS["P"].symmetric_intent_routing is False
+    assert CONFIGS["R"].symmetric_intent_routing is True
+    assert replace(CONFIGS["P"], name="R", symmetric_intent_routing=True) == CONFIGS["R"]
+    assert HARD_CONSTRAINT_INTENTS == {"buying", "intent_override"}
+    assert BUYING_PRECISION_INTENTS < HARD_CONSTRAINT_INTENTS
+
+
+def test_precision_route_membership_follows_configured_set() -> None:
+    class StubRetriever:
+        def __init__(self, asin: str) -> None:
+            self.asin = asin
+
+        def search(self, query: RetrievalQuery, k: int) -> list[Candidate]:
+            return [Candidate(self.asin, 1.0)]
+
+    query = RetrievalQuery("boots")
+    default = HybridRetriever(StubRetriever("lexical"), StubRetriever("dense"))
+    symmetric = HybridRetriever(
+        StubRetriever("lexical"),
+        StubRetriever("dense"),
+        precision_intents=HARD_CONSTRAINT_INTENTS,
+    )
+    for intent in ("buying", "intent_override", "browsing"):
+        default_components = set(default.search_for_intent(query, 10, intent)[0].components)
+        symmetric_components = set(symmetric.search_for_intent(query, 10, intent)[0].components)
+        precise = {"buying_lexical_rrf", "buying_hybrid_rrf"}
+        assert (default_components == precise) is (intent == "buying")
+        assert (symmetric_components == precise) is (intent in HARD_CONSTRAINT_INTENTS)
 
 
 def test_hybrid_intent_route_uses_lexical_for_buying_only() -> None:

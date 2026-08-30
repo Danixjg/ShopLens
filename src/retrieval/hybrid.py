@@ -4,7 +4,13 @@ from pathlib import Path
 
 from src.catalog import Catalog
 from src.contracts.config import RunConfig
-from src.contracts.retrieval import Candidate, RetrievalQuery, Retriever
+from src.contracts.retrieval import (
+    BUYING_PRECISION_INTENTS,
+    Candidate,
+    HARD_CONSTRAINT_INTENTS,
+    RetrievalQuery,
+    Retriever,
+)
 from src.retrieval.bm25 import BM25Retriever
 from src.retrieval.dense import DenseRetriever, DenseUnavailable, OFFICIAL_MODEL_PATH
 
@@ -12,10 +18,17 @@ from src.retrieval.dense import DenseRetriever, DenseUnavailable, OFFICIAL_MODEL
 class HybridRetriever:
     """Reciprocal-rank fusion of lexical and dense candidate lists."""
 
-    def __init__(self, lexical: Retriever, dense: Retriever, rank_constant: int = 60) -> None:
+    def __init__(
+        self,
+        lexical: Retriever,
+        dense: Retriever,
+        rank_constant: int = 60,
+        precision_intents: frozenset[str] = BUYING_PRECISION_INTENTS,
+    ) -> None:
         self.lexical = lexical
         self.dense = dense
         self.rank_constant = rank_constant
+        self.precision_intents = precision_intents
 
     def _source_lists(
         self, query: RetrievalQuery, k: int,
@@ -61,11 +74,17 @@ class HybridRetriever:
     def search_for_intent(
         self, query: RetrievalQuery, k: int, intent: str,
     ) -> list[Candidate]:
-        """Route Buying to lexical-weighted recall; keep discovery intents hybrid."""
+        """Route explicit-constraint intents to lexical-weighted recall.
+
+        Discovery intents stay on the balanced hybrid fusion. Which intents count
+        as explicit is set by ``precision_intents`` at construction; the scoring
+        layer's high-intent set is the same question answered independently, so
+        the two must be reconciled deliberately rather than by coincidence.
+        """
         count = self._safe_k(k)
         if count == 0:
             return []
-        if intent != "buying":
+        if intent not in self.precision_intents:
             return self.search(query, count)
         lexical_pool, dense_pool = self._source_lists(query, count)
         lexical = lexical_pool[:count]
@@ -101,4 +120,12 @@ def build_retriever(
         return BM25Retriever(catalog)
     if config.retrieval_mode == "dense":
         return dense
-    return HybridRetriever(BM25Retriever(catalog), dense)
+    return HybridRetriever(
+        BM25Retriever(catalog),
+        dense,
+        precision_intents=(
+            HARD_CONSTRAINT_INTENTS
+            if config.symmetric_intent_routing
+            else BUYING_PRECISION_INTENTS
+        ),
+    )
