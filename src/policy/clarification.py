@@ -102,6 +102,26 @@ class ClarificationPolicy:
             else None
         )
 
+    def _eligible(
+        self, unasked: list[str], candidates: list[Candidate],
+    ) -> list[str]:
+        """Drop facets no candidate can answer, when the gate is enabled.
+
+        A facet may be present in the schema yet unpopulated across the live
+        pool, in which case a question about it cannot be answered from the
+        catalog and spends a turn for nothing. Gating is skipped without a
+        catalog, and never returns an empty list: going silent is worse than
+        asking a sparse facet.
+        """
+        if not self.config.facet_population_gate or self.catalog is None:
+            return unasked
+        pool = self._pool(candidates)
+        populated = [
+            attribute for attribute in unasked
+            if any(self.catalog.facet_values(candidate.asin, attribute) for candidate in pool)
+        ]
+        return populated or unasked
+
     def _information_choice(
         self, state: SessionState, candidates: list[Candidate], over_general: bool,
     ) -> AskAttribute | None:
@@ -110,6 +130,7 @@ class ClarificationPolicy:
             if attribute not in state.asked_attributes
             and attribute not in state.declined_attributes
         ]
+        unasked = self._eligible(unasked, candidates)
         if over_general and unasked:
             pool = self._pool(candidates)
             gain, _, attribute = max(

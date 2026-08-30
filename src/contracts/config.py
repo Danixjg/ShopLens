@@ -36,6 +36,7 @@ class RunConfig:
     popularity_rerank: bool = False
     symmetric_intent_routing: bool = False
     profile_rerank: bool = False
+    facet_population_gate: bool = False
     popularity_rerank_weight: float = 0.0
     profile_rerank_weight: float = 0.0
 
@@ -116,6 +117,20 @@ CONFIGS: dict[str, RunConfig] = {
         clarification="expected_value",
         dynamic_weights=True,
         phrase_rerank=True,
+    ),
+    # Research-derived ablation: P with only clarification facet eligibility
+    # changed, so an unanswerable facet is not spent on a turn. It remains
+    # experimental until its dev gate is run and recorded.
+    "V": replace(
+        _A,
+        name="V",
+        retrieval_mode="hybrid",
+        constraint_scoring=True,
+        session_memory=True,
+        clarification="info_gain",
+        dynamic_weights=True,
+        phrase_rerank=True,
+        facet_population_gate=True,
     ),
     "Z": replace(_A, name="Z", clarification="off"),
 }
