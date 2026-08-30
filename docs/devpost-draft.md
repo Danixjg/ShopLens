@@ -24,6 +24,11 @@ Buying-versus-Browsing routing rather than destructive filters.
 - Hard constraints apply bounded per-attribute evidence, never filters.
 - Candidate-pool overload selects the facet with the highest normalized
   multiclass information gain, excluding declined attributes.
+- Experimental config U instead ranks eligible attributes by deterministic
+  expected Top-K utility over possible catalog-facet answers. This is an
+  independent adaptation of Rao and Daumé III's EVPI framing, not a port of
+  their neural model; the canonical citation is in
+  `docs/research-attribution.md`.
 - A local contiguous-phrase rarity bonus reranks only the frozen Top 10, so it
   can improve MRR without changing Hit Rate membership.
 
@@ -58,27 +63,35 @@ preserving HR/MTTC. A paired, scenario-stratified 10,000-resample bootstrap
 (seed 2026) put its TechnicalScore gain at `0.019567`, with a 95% interval of
 `[0.010258, 0.029980]`.
 
-The next dev-only candidate, Q, adds a bounded log-scaled rating-count prior
+The next candidate, Q, adds a bounded log-scaled rating-count prior
 inside P's already-frozen Top-10. It preserves P's relevance score and adds a
 maximum-weighted `0.15 * popularity / 61` bonus, without filtering products or
 changing catalog membership. Q scored `0.862083` on dev (HR@10 `0.941667`, MRR
 `0.779722`, MTTC `3.133333`): 50 target ranks improved, none regressed, and all
-four scenario MRRs increased. Q has not been opened on holdout and is not yet
-claimed as the retained configuration. The idea followed an aggregate review
-of target rating counts across all public sessions, so any eventual Q holdout
-result will be disclosed as exploratory rather than statistically untouched.
-A paired, scenario-stratified 10,000-resample bootstrap (seed 2026) estimated
-Q's dev TechnicalScore gain over P at `0.042145`, with a 95% interval of
-`[0.030926, 0.054362]`.
+four scenario MRRs increased. A later clean reportable holdout row scored
+`0.880321` (HR@10 `0.975`, MRR `0.766071`, MTTC `2.85`). Q is not yet claimed
+as the retained configuration. The idea followed an aggregate review of target
+rating counts across all public sessions, so its holdout result is exploratory
+rather than statistically untouched. A paired, scenario-stratified
+10,000-resample bootstrap (seed 2026) estimated Q's dev TechnicalScore gain
+over P at `0.042145`, with a 95% interval of `[0.030926, 0.054362]`.
 
-The P rows are clean canonical evidence in `results.jsonl`; Q remains a dirty
-dev diagnostic until its implementation is committed and rerun. P used the
-pinned CPU model and identical catalog, dataset, model, cache, and embedding-
-content digests, with zero agent or evaluator response exceptions and $0 API
-cost. Boundary HR@10 moved from the historical F `0.166667/0.25` to P
-`1.0/0.75` on dev/holdout; Buying, Browsing, and Intent Override also improved
-or held in aggregate. Configs G and H are not claimed because no plan-specified
-offline cross-encoder or LLM provider exists.
+The P rows are clean canonical evidence in `results.jsonl`. Q's clean
+reportable dev and exploratory holdout rows are recorded at commits `1b55d92`
+and `5d5a486`, respectively. These runs used the pinned CPU model, with zero
+agent or evaluator response exceptions and $0 API cost. Boundary HR@10 moved
+from the historical F `0.166667/0.25` to P `1.0/0.75` on dev/holdout; Buying,
+Browsing, and Intent Override also improved or held in aggregate. Configs G and
+H are not claimed because no plan-specified offline cross-encoder or LLM
+provider exists.
+
+The research-derived U ablation replaced only P's information-gain question
+policy with deterministic expected-question-value scoring. On a clean dev run
+at commit `87834f4` it preserved HR@10 at `0.941667` and increased MRR to
+`0.641323`, but MTTC worsened to `3.175000`; TechnicalScore was `0.819730`, just
+below P's pre-registered `0.819939` threshold. We therefore rejected U and did
+not open holdout. This negative result is retained because it separates an
+appealing research framing from a measured competition improvement.
 
 ## Limitations and future work
 
@@ -87,6 +100,8 @@ offline cross-encoder or LLM provider exists.
 - The deterministic parser is tailored to controlled simulator language, not
   arbitrary noisy commerce conversations.
 - Sparse catalog metadata makes some constraints, especially color, unreliable.
+- The expected-question-value experiment uses catalog facets as a target-free
+  proxy for possible answers; it cannot predict every free-form shopper reply.
 - Q favors established products over niche or newly listed products, and the
   public target construction may amplify that popularity bias.
 - The optional cross-encoder and LLM-ranking experiments are not claimed until
@@ -97,6 +112,22 @@ offline cross-encoder or LLM provider exists.
 Given more time, we would validate paraphrased language, calibrate scoring on a
 larger labeled split, and investigate category-aware diversity for Boundary
 without using private-target assumptions.
+
+## Research credit
+
+ShopLens independently adapted the EVPI framing in the following work; it did
+not reproduce or port the paper's neural model, source code, training data,
+annotations, or weights:
+
+> Sudha Rao and Hal Daumé III. 2018. *Learning to Ask Good Questions: Ranking
+> Clarification Questions using Neural Expected Value of Perfect Information.*
+> Proceedings of the 56th Annual Meeting of the Association for Computational
+> Linguistics (Volume 1: Long Papers), ACL 2018, pages 2737–2746.
+
+DOI: [10.18653/v1/P18-1255](https://doi.org/10.18653/v1/P18-1255). Canonical
+publication: [ACL Anthology](https://aclanthology.org/P18-1255/). The paper is
+licensed under Creative Commons Attribution 4.0 International (CC BY 4.0). The
+full adoption boundary is in [research-attribution.md](research-attribution.md).
 
 ## Team contributions
 

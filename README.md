@@ -6,6 +6,13 @@ the same turn that it returns up to ten ranked products, remembers disclosed
 constraints, and removes superseded preferences when the shopper changes
 their mind.
 
+The planned extension of its preference and clarification policy is informed
+by Li et al.'s TRACER method from *Wizard of Shopping* (ACL 2025). ShopLens is
+an independent implementation and currently contains neither upstream TRACER
+code nor Wizard of Shopping dataset records. The
+[source audit and adoption boundary](docs/wizard-of-shopping-integration.md)
+records the full citation, license evidence, and adopt/evaluate/defer decisions.
+
 The system implements the organizer's `Agent.reset(...)` and
 `Agent.respond(...)` interface. It does not modify the catalog or evaluator,
 call a paid API, or require network access during baseline scoring.
@@ -40,8 +47,9 @@ The implementation is split by responsibility:
 - `src/retrieval/`: weighted FTS5 BM25, optional local dense retrieval, and reciprocal-rank fusion.
 - `src/scoring/`: bounded non-filtering constraint evidence, dynamic routes,
   and membership-preserving phrase-rarity reranking.
-- `src/policy/`: candidate-facet information gain with targeted fallback and
-  persistent per-attribute decline handling.
+- `src/policy/`: candidate-facet information gain plus an experimental
+  expected-question-value mode, with targeted fallback and persistent
+  per-attribute decline handling.
 - `src/agent.py`: integration and last-non-empty/global failure recovery.
 - `agent.py` and `starter/agent.py`: thin shims for submission and the organizer's local evaluator.
 
@@ -200,28 +208,27 @@ hide override failures:
 ### Accuracy candidate validation
 
 Config P was frozen after dev-only tuning, opened on holdout once, and recorded
-as canonical reportable evidence in `results.jsonl`; Q remains dev-only. Q's row
-is diagnostic because its implementation is still uncommitted. Both used true
-hybrid retrieval and the pinned CPU model with zero agent/evaluator response
-exceptions. After the Q implementation commit, rerun the clean command before
-retaining Q or replacing P's evidence.
+as canonical reportable evidence in `results.jsonl`. Config Q has a clean
+reportable dev row at `1b55d92` and a clean reportable exploratory holdout row
+at `5d5a486`; P remains the retained configuration. Both used true hybrid
+retrieval and the pinned CPU model with zero agent/evaluator response
+exceptions.
 
 | Config | Dev HR@10 | Dev MRR | Dev MTTC | Dev Score | Holdout HR@10 | Holdout MRR | Holdout MTTC | Holdout Score |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | F, new state/policy | 0.9417 | 0.5740 | 3.1333 | 0.8004 | — | — | — | — |
 | **P, phrase λ=0.15** | **0.9417** | **0.6392** | **3.1333** | **0.8199** | **0.9750** | **0.6449** | **2.8500** | **0.8440** |
-| Q, popularity λ=0.15 | 0.9417 | 0.7797 | 3.1333 | 0.8621 | — | — | — | — |
+| Q, popularity λ=0.15 | 0.9417 | 0.7797 | 3.1333 | 0.8621 | 0.9750 | 0.7661 | 2.8500 | 0.8803 |
 
-Q was selected and evaluated on dev only; its public holdout metric remains
-unopened for this implementation. Against P it improved 50 target ranks,
-regressed none, and left 70 unchanged. HR@10 and MTTC were identical in every
-scenario. Dev MRR rose from P to Q for Boundary (`0.7417` → `0.8889`),
+Q was selected on dev, where against P it improved 50 target ranks, regressed
+none, and left 70 unchanged. HR@10 and MTTC were identical in every scenario.
+Dev MRR rose from P to Q for Boundary (`0.7417` → `0.8889`),
 Browsing (`0.6708` → `0.7760`), Buying (`0.6042` → `0.7948`), and Intent
-Override (`0.6144` → `0.7130`). These are dirty diagnostic results until Q is
-committed and reproduced by the clean evidence runner. Because the popularity
+Override (`0.6144` → `0.7130`). Q's later holdout row scored HR@10 `0.9750`,
+MRR `0.7661`, MTTC `2.8500`, and TechnicalScore `0.8803`. Because the popularity
 hypothesis followed an aggregate review of target rating counts across all 200
-public sessions, Q's eventual holdout result must be labeled exploratory, not
-statistically untouched. A scenario-stratified paired bootstrap (10,000
+public sessions, that holdout result is exploratory, not statistically
+untouched. A scenario-stratified paired bootstrap (10,000
 resamples, seed 2026) estimates Q's dev TechnicalScore gain over P at
 `0.042145`, with a 95% interval of `[0.030926, 0.054362]`.
 
@@ -260,7 +267,18 @@ uses baseline A. Hybrid configurations require the optional dense install.
 | H | Optional LLM rank experiment; offline path remains available |
 | P | F plus membership-preserving phrase-rarity reranking |
 | Q | P plus a bounded rating-count prior inside the frozen Top-10 |
+| U | P plus deterministic expected-question-value clarification |
 | Z | Clarification off, diagnostic only |
+
+U is a documented research ablation, not a retained configuration. Its clean
+dev run at `87834f4` kept HR@10 at `0.941667` and raised MRR from P's
+`0.639239` to `0.641323`, but MTTC moved from `3.133333` to `3.175000`.
+TechnicalScore therefore fell from `0.819939` to `0.819730` (`-0.000209`),
+missing the pre-registered retention gate. U was rejected without opening
+holdout; the reportable dev record remains in `results.jsonl`. U independently
+adapts the paper's EVPI idea into a target-free expected Top-K posterior-mass
+gain over catalog-facet answers. Sparse or missing facets and free-form answers
+outside those catalog proxies limit what the score can represent.
 
 Q uses only the immutable organizer catalog. For each member of P's frozen
 Top-10 it log-scales `rating_number` against the catalog maximum and adds
@@ -280,10 +298,10 @@ provider. Neither is claimed as completed.
 
 ## Cost, latency, and network disclosure
 
-Configs A–G, P, and Q use zero prompt tokens, zero completion tokens, and no paid
-service, so their model cost is $0. They run fully offline after the catalog
-and selected local dependencies are present. Candidate values above remain
-explicitly diagnostic until regenerated from a clean commit.
+Configs A–G, P, Q, and U use zero prompt tokens, zero completion tokens, and no
+paid service, so their model cost is $0. They run fully offline after the
+catalog and selected local dependencies are present. Experimental results
+remain subject to their stated retention gates.
 
 ## Limitations
 
@@ -326,6 +344,23 @@ submission freeze; no names are inferred where the repository contains none.
 The catalog and sessions derive from Amazon Reviews 2023 by McAuley Lab,
 UCSD. See [DATA_ATTRIBUTION.md](DATA_ATTRIBUTION.md) for the required citation
 and redistribution terms.
+
+## Research attribution
+
+The experimental expected-question-value clarification policy is an
+independent deterministic adaptation of the EVPI framing introduced by Sudha
+Rao and Hal Daumé III; it is inspired by the paper, not a reproduction or port
+of its neural model, code, or data:
+
+> Sudha Rao and Hal Daumé III. 2018. *Learning to Ask Good Questions: Ranking
+> Clarification Questions using Neural Expected Value of Perfect Information.*
+> Proceedings of the 56th Annual Meeting of the Association for Computational
+> Linguistics (Volume 1: Long Papers), ACL 2018, pages 2737–2746.
+
+DOI: [10.18653/v1/P18-1255](https://doi.org/10.18653/v1/P18-1255). Canonical
+publication: [ACL Anthology](https://aclanthology.org/P18-1255/). The paper is
+licensed under Creative Commons Attribution 4.0 International (CC BY 4.0). See
+[Research attribution](docs/research-attribution.md) for the adoption boundary.
 
 Submission working documents: [Devpost draft](docs/devpost-draft.md),
 [demo script](docs/demo-script.md), and

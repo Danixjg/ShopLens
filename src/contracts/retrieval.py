@@ -24,3 +24,12 @@ class Candidate:
 
 class Retriever(Protocol):
     def search(self, query: RetrievalQuery, k: int) -> list[Candidate]: ...
+
+
+# Routes whose turns carry an explicit hard constraint, so lexical precision is
+# the appropriate evidence. Kept as data in the contracts layer because both the
+# retriever and the dynamic scorer answer this same question independently; the
+# Buying-only and hard-constraint-symmetric policies are then one flag apart and
+# can be measured against each other (findings 6 and 17).
+BUYING_PRECISION_INTENTS: frozenset[str] = frozenset({"buying"})
+HARD_CONSTRAINT_INTENTS: frozenset[str] = frozenset({"buying", "intent_override"})

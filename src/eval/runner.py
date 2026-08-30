@@ -62,6 +62,31 @@ def _peak_rss_kb() -> int | None:
     return maxrss // 1024 if sys.platform == "darwin" else maxrss
 
 
+def _latency_summary(samples: list[float]) -> dict[str, float | int] | None:
+    """Per-turn agent latency distribution in milliseconds.
+
+    Only turns that returned a response are summarised, so a diagnostic run
+    whose agent raised cannot pull the percentiles down with fast failure
+    paths. Percentiles use nearest-rank on the sorted sample.
+    """
+    if not samples:
+        return None
+    ordered = sorted(samples)
+
+    def percentile(fraction: float) -> float:
+        index = int(round(fraction * (len(ordered) - 1)))
+        return ordered[min(len(ordered) - 1, max(0, index))]
+
+    return {
+        "turns": len(ordered),
+        "p50": round(percentile(0.50), 3),
+        "p95": round(percentile(0.95), 3),
+        "p99": round(percentile(0.99), 3),
+        "max": round(ordered[-1], 3),
+        "mean": round(sum(ordered) / len(ordered), 3),
+    }
+
+
 def _git_sha() -> str:
     try:
         return subprocess.run(
@@ -298,17 +323,20 @@ class _EvaluatorAgentProxy:
         self.catalog_ids = catalog_ids
         self.raised_exception_count = 0
         self.invalid_response_count = 0
+        self.turn_latency_ms: list[float] = []
 
     def reset(self, session_id: str, user_profile: dict) -> None:
         self.agent.reset(session_id, user_profile)
 
     def respond(self, session_id: str, user_message: str, turn: int, top_k: int) -> Any:
+        started = time.perf_counter()
         try:
             response = self.agent.respond(session_id, user_message, turn, top_k)
             valid = self._valid_response(response, top_k)
         except Exception:
             self.raised_exception_count += 1
             raise
+        self.turn_latency_ms.append((time.perf_counter() - started) * 1000.0)
         if not valid:
             self.invalid_response_count += 1
         return response
@@ -504,9 +532,11 @@ def main() -> None:
     prior_checksum = os.environ.get("SHOPLENS_CATALOG_SHA256")
     if input_snapshot is not None:
         os.environ["SHOPLENS_CATALOG_SHA256"] = catalog_digest_before
+    construction_started = time.perf_counter()
     try:
         agent = Agent(execution_catalog, config=config)
     finally:
+        agent_init_seconds = time.perf_counter() - construction_started
         if input_snapshot is not None:
             if prior_checksum is None:
                 os.environ.pop("SHOPLENS_CATALOG_SHA256", None)
@@ -682,7 +712,9 @@ def main() -> None:
                 "dense_provenance": dense_provenance,
             },
             "elapsed_seconds": round(elapsed_seconds, 6),
+            "agent_init_seconds": round(agent_init_seconds, 6),
             "peak_rss_kb": _peak_rss_kb(),
+            "turn_latency_ms": _latency_summary(proxy.turn_latency_ms),
         },
     }
     final_sha = _git_sha()

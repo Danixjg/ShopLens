@@ -12,7 +12,11 @@ ConstraintPairs: TypeAlias = tuple[tuple[str, str], ...]
 
 @dataclass(frozen=True, slots=True)
 class ParsedTurn:
-    intent: str
+    # ``None`` means the turn carries no intent signal, not "browsing". Ordinary
+    # disclosure and decline replies do not re-declare why the customer is here,
+    # so they must leave an established route unchanged rather than rely on the
+    # state layer to ignore a semantically false event.
+    intent: str | None
     category: str | None
     hard_constraints: ConstraintPairs = ()
     soft_preferences: ConstraintPairs = ()

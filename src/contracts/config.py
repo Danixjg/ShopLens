@@ -6,7 +6,7 @@ from typing import Literal
 
 
 RetrievalMode = Literal["bm25", "dense", "hybrid"]
-ClarificationMode = Literal["off", "empty_result_only", "info_gain"]
+ClarificationMode = Literal["off", "empty_result_only", "info_gain", "expected_value"]
 RerankerMode = Literal["none", "local_cross_encoder"]
 
 HIT_RATE_WEIGHT = 0.50
@@ -17,6 +17,9 @@ MAX_TURNS = 10
 # Selected once on the 120-session dev split. The public holdout is not used
 # to revise this value.
 POPULARITY_RERANK_WEIGHT = 0.15
+# Selected once on the 120-session dev split. The public holdout is not used
+# to revise this value.
+PROFILE_RERANK_WEIGHT = 0.05
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,7 +34,10 @@ class RunConfig:
     llm_rank: bool = False
     phrase_rerank: bool = False
     popularity_rerank: bool = False
+    symmetric_intent_routing: bool = False
+    profile_rerank: bool = False
     popularity_rerank_weight: float = 0.0
+    profile_rerank_weight: float = 0.0
 
 
 _A = RunConfig()
@@ -56,6 +62,60 @@ CONFIGS: dict[str, RunConfig] = {
         phrase_rerank=True,
         popularity_rerank=True,
         popularity_rerank_weight=POPULARITY_RERANK_WEIGHT,
+    ),
+    "R": replace(
+        _A,
+        name="R",
+        retrieval_mode="hybrid",
+        constraint_scoring=True,
+        session_memory=True,
+        clarification="info_gain",
+        dynamic_weights=True,
+        phrase_rerank=True,
+        symmetric_intent_routing=True,
+    ),
+    "S": replace(
+        _A,
+        name="S",
+        retrieval_mode="hybrid",
+        constraint_scoring=True,
+        session_memory=True,
+        clarification="info_gain",
+        dynamic_weights=True,
+        phrase_rerank=True,
+        profile_rerank=True,
+        profile_rerank_weight=PROFILE_RERANK_WEIGHT,
+    ),
+    # Every component below independently passed the dev + holdout + per-scenario
+    # retention gate against P. T measures whether they compose; it is retained
+    # only if the combination also clears that gate.
+    "T": replace(
+        _A,
+        name="T",
+        retrieval_mode="hybrid",
+        constraint_scoring=True,
+        session_memory=True,
+        clarification="info_gain",
+        dynamic_weights=True,
+        phrase_rerank=True,
+        symmetric_intent_routing=True,
+        profile_rerank=True,
+        profile_rerank_weight=PROFILE_RERANK_WEIGHT,
+        popularity_rerank=True,
+        popularity_rerank_weight=POPULARITY_RERANK_WEIGHT,
+    ),
+    # Research-derived ablation: P with only the clarification question-value
+    # policy changed. It remains experimental until its dev gate is frozen and
+    # a single holdout run is recorded.
+    "U": replace(
+        _A,
+        name="U",
+        retrieval_mode="hybrid",
+        constraint_scoring=True,
+        session_memory=True,
+        clarification="expected_value",
+        dynamic_weights=True,
+        phrase_rerank=True,
     ),
     "Z": replace(_A, name="Z", clarification="off"),
 }

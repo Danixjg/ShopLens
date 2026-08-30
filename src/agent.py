@@ -17,6 +17,7 @@ from src.scoring import (
     LocalCrossEncoderReranker,
     PhraseReranker,
     PopularityReranker,
+    ProfileAffinityReranker,
 )
 from src.state import apply_parsed_turn, build_retrieval_query
 
@@ -39,7 +40,7 @@ class Agent:
             catalog,
             explicit_checksum,
             uses_default_path or uses_official_path,
-            build_facets=self.config.clarification == "info_gain",
+            build_facets=self.config.clarification in {"info_gain", "expected_value"},
         )
         self.retriever = build_retriever(self.catalog, self.config)
         self.constraint_scorer = ConstraintScorer(self.catalog)
@@ -53,6 +54,11 @@ class Agent:
         self.popularity_reranker = (
             PopularityReranker(self.catalog, self.config.popularity_rerank_weight)
             if self.config.popularity_rerank
+            else None
+        )
+        self.profile_reranker = (
+            ProfileAffinityReranker(self.catalog, self.config.profile_rerank_weight)
+            if self.config.profile_rerank
             else None
         )
         self.parser = TurnParser()
@@ -169,6 +175,10 @@ class Agent:
             candidates = self.phrase_reranker.rerank(state, candidates, pool)
         if self.popularity_reranker is not None:
             candidates = self.popularity_reranker.rerank(candidates)
+        if self.profile_reranker is not None:
+            # Applied last and inside frozen membership: the supplied profile may
+            # break a tie the disclosed constraints left open, never outrank them.
+            candidates = self.profile_reranker.rerank(state, candidates)
 
         asins = [item.asin for item in candidates]
         if not asins:
@@ -176,7 +186,12 @@ class Agent:
         if asins:
             state.last_recommendations = list(asins)
 
-        ask_attribute = self.policy.choose(state, pool, over_general)
+        ask_attribute = self.policy.choose(
+            state,
+            pool,
+            over_general,
+            recommendation_limit=safe_k,
+        )
         if ask_attribute is not None and ask_attribute not in state.asked_attributes:
             state.asked_attributes.append(ask_attribute)
         return AgentReply(
