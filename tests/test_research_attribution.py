@@ -198,3 +198,32 @@ def test_public_docs_never_quote_an_exploratory_score_without_the_label() -> Non
                     unlabelled.append(f"{path.name} {config} {score}: {line.strip()[:60]}")
 
     assert not unlabelled
+
+
+def test_readme_never_describes_a_measured_config_as_unrun() -> None:
+    """A config holding a reportable row may not be described as never run.
+
+    V's prose survived its own evaluation: it still claimed V was unevaluated
+    with no row in results.jsonl, while the candidate table in the same
+    document already quoted V's dev score.
+    """
+    text = (ROOT / "README.md").read_text(encoding="utf-8")
+    measured = sorted(
+        {
+            json.loads(line)["config"]
+            for line in RESULTS_LOG.read_text(encoding="utf-8").splitlines()
+            if line.strip() and json.loads(line)["reportable"]
+        }
+    )
+
+    stale = [
+        f"{config}: {claim}"
+        for config in measured
+        for claim in (
+            f"{config} is implemented but **unevaluated**",
+            f"so {config} is not a retained configuration and has",
+        )
+        if claim in text
+    ]
+
+    assert not stale
