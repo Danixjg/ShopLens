@@ -115,11 +115,11 @@ class TestClarificationSequence(unittest.TestCase):
         response = self.agent.respond("s1", "more info", turn=4, top_k=10)
         self.assertEqual(response["ask_attribute"], "other")
 
-    def test_turn5_stays_other(self) -> None:
+    def test_turn5_stops_after_other(self) -> None:
         for t in range(1, 5):
             self.agent.respond("s1", "shoe", turn=t, top_k=10)
         response = self.agent.respond("s1", "still more", turn=5, top_k=10)
-        self.assertEqual(response["ask_attribute"], "other")
+        self.assertIsNone(response["ask_attribute"])
 
     def test_three_turn_attribute_order(self) -> None:
         """Exact sequence over turns 1–3 must be feature, material, color."""
@@ -130,15 +130,15 @@ class TestClarificationSequence(unittest.TestCase):
         ]
         self.assertEqual(actual, expected)
 
-    def test_no_targeted_repeat_after_exhaustion(self) -> None:
-        """Once all targeted attributes asked, only 'other' is returned."""
+    def test_no_repeat_after_exhaustion(self) -> None:
+        """The wildcard is used once after targeted attributes, then probing stops."""
         attrs = [
             self.agent.respond("s1", "shoe", turn=t, top_k=10)["ask_attribute"]
             for t in range(1, 8)
         ]
-        # First 3 are feature, material, color; remaining 4 are all 'other'
         self.assertEqual(attrs[:3], ["feature", "material", "color"])
-        self.assertTrue(all(a == "other" for a in attrs[3:]))
+        self.assertEqual(attrs[3], "other")
+        self.assertTrue(all(a is None for a in attrs[4:]))
 
 
 # ---------------------------------------------------------------------------
@@ -412,7 +412,7 @@ class TestResponseSchema(unittest.TestCase):
         self.assertIsInstance(r["message"], str)
 
     def test_ask_attribute_in_allowed_values(self) -> None:
-        allowed = {"category", "material", "color", "size", "style", "brand",
+        allowed = {None, "category", "material", "color", "size", "style", "brand",
                    "budget", "feature", "use_case", "other"}
         for turn in range(1, 6):
             r = self.agent.respond("s1", "shoe", turn=turn, top_k=10)
@@ -462,10 +462,11 @@ class TestResponseSchema(unittest.TestCase):
 
 
 class TestResetGuard(unittest.TestCase):
-    def test_respond_before_reset_raises(self) -> None:
+    def test_respond_before_reset_degrades_gracefully(self) -> None:
         agent, _ = _make_agent()
-        with self.assertRaises(RuntimeError):
-            agent.respond("unknown-session", "shoe", turn=1, top_k=10)
+        response = agent.respond("unknown-session", "shoe", turn=1, top_k=10)
+        self.assertIsInstance(response["message"], str)
+        self.assertGreater(len(response["recommendations"]), 0)
 
     def test_respond_after_reset_does_not_raise(self) -> None:
         agent, _ = _make_agent()

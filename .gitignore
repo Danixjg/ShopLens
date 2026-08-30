@@ -2,8 +2,13 @@ __pycache__/
 *.py[cod]
 .DS_Store
 .env
+# Local dependency environments, including the optional uv path in README.
+.venv/
+.venv-dense/
+venv/
 results.json
 data/catalog.jsonl
+data/catalog.embeddings.npz
 data/releases/
 # Organizer-only code, private evaluation data, manifests, and build reports.
 organizer/
@@ -16,3 +21,10 @@ docs/participant_release_checklist.md
 tests/test_5core_builder.py
 tests/test_organizer_pipeline.py
 *.log
+# Third-party reference papers read locally. They are not ours to redistribute
+# and must never enter the submission bundle.
+docs/*.pdf
+docs/Learning_to_Ask_Good_Questions.md
+docs/Wizard_of_Shopping.md
+# WSL alternate-data-stream artifacts from downloaded files.
+*:Zone.Identifier

@@ -11,3 +11,19 @@ The competition package does not contain images, videos, account credentials, pr
 
 Participants must follow the source dataset's applicable terms and use the data only for the competition, research, and other permitted purposes. The competition organizer does not claim ownership of the underlying Amazon review or product content.
 
+## Research-method attribution
+
+Planned dialogue-policy experiments are informed by **TRACER**, introduced by
+Xiangci Li, Zhiyu Chen, Jason Ingyu Choi, Nikhita Vedula, Besnik Fetahu, Oleg
+Rokhlenko, and Shervin Malmasi in *Wizard of Shopping: Target-Oriented
+E-commerce Dialogue Generation with Decision Tree Branching* (ACL 2025).
+
+- Paper: https://aclanthology.org/2025.acl-long.641/
+- DOI: https://doi.org/10.18653/v1/2025.acl-long.641
+- License for the paper: CC BY 4.0
+- Source audit and adoption boundary:
+  [docs/wizard-of-shopping-integration.md](docs/wizard-of-shopping-integration.md)
+
+ShopLens currently includes no upstream TRACER code and no Wizard of Shopping
+dataset records. The source audit explains why those separately published
+artifacts remain excluded pending compatible, explicit reuse terms.
