@@ -88,3 +88,79 @@ already done at commit `547bdb1` in this same environment, where local `P`
 reproduced canonical `P` on dev exactly across all five metrics; that evidence
 is recorded in `facet-population-gate.tdd.md`. The canonical thresholds above
 are therefore directly usable.
+
+## Dev outcome, recorded 2026-08-30
+
+Run once as `python3 -m src.eval.runner --config T --split dev` from clean
+commit `0371a54` — the commit that froze the gate above — in the reference
+environment (CPython 3.12.13, Linux x86-64, lock `bcc0ef81…`, 0 mismatches,
+official catalog `da979b05…` and public set `857259f7…`). Accepted as
+`"reportable": true` with no reportability reasons and zero agent, evaluator,
+and invalid-response exceptions. Nothing was tuned; both weights stayed at
+their frozen values.
+
+### Retention gate: PASS
+
+| Criterion | Threshold | T observed | Δ vs P |
+|---|---|---|---|
+| dev TechnicalScore | ≥ 0.819939 | **0.866774** | +0.046835 |
+| dev HitRate@10 | ≥ 0.941667 | 0.941667 | +0.000000 |
+| scenario `boundary` | ≥ 0.839167 | 0.911667 | +0.052500 |
+| scenario `browsing` | ≥ 0.837904 | 0.889851 | +0.031947 |
+| scenario `buying` | ≥ 0.781674 | 0.859167 | +0.057493 |
+| scenario `intent_override` | ≥ 0.734325 | 0.810556 | +0.056230 |
+| exceptions | 0 | 0 | — |
+
+Unlike config `V`, this is not a tie. Every scenario improves, and no
+scenario regresses at all.
+
+### Composition criterion: PASS
+
+| | Dev TechnicalScore |
+|---|---|
+| best single component (`Q`) | 0.862083 |
+| **`T` observed** | **0.866774** |
+| margin | **+0.004691** |
+
+`T` clears the bar declared before the run, so by the frozen rule the
+components compose and `T` may be opened on holdout once.
+
+### Where the composition gain actually comes from
+
+The margin over `Q` is real but small, and it is not spread evenly:
+
+| Scenario | T − P | T − Q |
+|---|---|---|
+| `boundary` | +0.052500 | +0.008333 |
+| `browsing` | +0.031947 | +0.000372 |
+| `buying` | +0.057493 | +0.000312 |
+| `intent_override` | +0.056230 | **+0.026667** |
+
+Against `Q`, `browsing` and `buying` are flat to three decimal places. Almost
+all of the composition gain is `intent_override`, which is exactly what `R`'s
+symmetric intent routing targets. The honest description is that `T`'s
+headline improvement is overwhelmingly `Q`'s popularity prior, with `R`
+adding a further, narrower gain confined to intent-override sessions.
+
+The components are also close to additive, slightly sub-additive:
+
+| | Dev gain over P |
+|---|---|
+| `R` alone | +0.003365 |
+| `S` alone | +0.003111 |
+| `Q` alone | +0.042144 |
+| sum of the three | +0.048620 |
+| **`T` measured** | **+0.046835** |
+
+`T` captures about 96% of the sum of the individual gains, so the flags
+overlap only slightly rather than interfering.
+
+One cost is visible: MTTC rises from `3.133333` to `3.141667`, the same small
+turn-count cost `R` carries alone, so efficiency dips marginally. MRR gains
+(`0.639239` → `0.795913`) dominate it by a wide margin.
+
+### Holdout status
+
+Both gates passed, so the single holdout opening is permitted. Per the label
+fixed in advance, any `T` holdout row is **exploratory**, not a clean
+untouched holdout, because `T` contains `Q`'s popularity prior.
