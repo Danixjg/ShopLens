@@ -137,11 +137,11 @@ def test_submission_config_builds_no_index() -> None:
     assert CONFIGS["O"].catalog_grounded_segmentation is False
 
 
-def test_config_k_is_o_plus_one_flag() -> None:
+def test_config_m_is_o_plus_one_flag() -> None:
     differing = {
         item.name
-        for item in fields(CONFIGS["K"])
-        if getattr(CONFIGS["K"], item.name) != getattr(CONFIGS["O"], item.name)
+        for item in fields(CONFIGS["M"])
+        if getattr(CONFIGS["M"], item.name) != getattr(CONFIGS["O"], item.name)
     }
     assert differing == {"name", "catalog_grounded_segmentation"}
 

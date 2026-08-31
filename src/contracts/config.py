@@ -282,9 +282,9 @@ CONFIGS: dict[str, RunConfig] = {
     # contains a semicolon currently becomes several slots, which inflates the
     # ordered-rerank match vector and dilutes the soft-term union that scores
     # it. Isolating the flag keeps the effect measurable against O.
-    "K": replace(
+    "M": replace(
         _A,
-        name="K",
+        name="M",
         retrieval_mode="hybrid",
         constraint_scoring=True,
         session_memory=True,
