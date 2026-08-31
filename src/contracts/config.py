@@ -6,7 +6,9 @@ from typing import Literal
 
 
 RetrievalMode = Literal["bm25", "dense", "hybrid"]
-ClarificationMode = Literal["off", "empty_result_only", "info_gain", "expected_value"]
+ClarificationMode = Literal[
+    "off", "empty_result_only", "info_gain", "expected_value", "embedding_promotion",
+]
 RerankerMode = Literal["none", "local_cross_encoder"]
 # What the dense encoder indexes. "full" is the historical flat concatenation;
 # "compact" keeps only the fields the BM25 index already weights highest.
@@ -47,6 +49,10 @@ class RunConfig:
     facet_population_gate: bool = False
     exclude_shown: bool = False
     ordered_rerank: bool = False
+    # Resolve a disclosure against known catalog field values rather than
+    # splitting on every semicolon. Catalog text uses ";" as punctuation, so
+    # the separator is not reserved and one value can look like several.
+    catalog_grounded_segmentation: bool = False
     popularity_rerank_weight: float = 0.0
     profile_rerank_weight: float = 0.0
     dense_text_recipe: DenseTextRecipe = "full"
@@ -279,7 +285,98 @@ CONFIGS: dict[str, RunConfig] = {
         exclude_shown=True,
         ordered_rerank=True,
     ),
+    # O with catalog-grounded disclosure segmentation. A feature bullet that
+    # contains a semicolon currently becomes several slots, which inflates the
+    # ordered-rerank match vector and dilutes the soft-term union that scores
+    # it. Isolating the flag keeps the effect measurable against O.
+    "M": replace(
+        _A,
+        name="M",
+        retrieval_mode="hybrid",
+        constraint_scoring=True,
+        session_memory=True,
+        clarification="info_gain",
+        dynamic_weights=True,
+        phrase_rerank=True,
+        popularity_rerank=True,
+        popularity_rerank_weight=POPULARITY_RERANK_WEIGHT,
+        exclude_shown=True,
+        ordered_rerank=True,
+        catalog_grounded_segmentation=True,
+    ),
     "Z": replace(_A, name="Z", clarification="off"),
+    # Research-derived ablation: O with the clarification policy's fixed
+    # attribute sequence extended by "budget" only, reached once
+    # feature/material/color/other are exhausted. 178/200 public-set target
+    # products carry a usable price (materialize_hidden_fields derives a
+    # budget soft preference only then), so a shopper can usually answer it,
+    # even though catalog-wide price coverage is much sparser. It remains
+    # experimental until its dev gate is run and recorded.
+    "K": replace(
+        _A,
+        name="K",
+        retrieval_mode="hybrid",
+        constraint_scoring=True,
+        session_memory=True,
+        clarification="info_gain",
+        dynamic_weights=True,
+        phrase_rerank=True,
+        popularity_rerank=True,
+        popularity_rerank_weight=POPULARITY_RERANK_WEIGHT,
+        exclude_shown=True,
+        ordered_rerank=True,
+        extended_clarification=True,
+    ),
+    # Research-derived ablation: O with the clarification policy excluding an
+    # attribute already covered by an active disclosed slot from what it will
+    # ask about next, the same way an already-asked or already-declined
+    # attribute is excluded. Probe evidence (2026-08-31 session) found a
+    # session that discloses feature, material, and color in its opening
+    # message still gets asked "Do you have a feature preference?" -- state
+    # tracking registers the disclosure correctly, but the clarification
+    # policy never consults it. It remains experimental until its dev gate is
+    # run and recorded.
+    "L": replace(
+        _A,
+        name="L",
+        retrieval_mode="hybrid",
+        constraint_scoring=True,
+        session_memory=True,
+        clarification="info_gain",
+        dynamic_weights=True,
+        phrase_rerank=True,
+        popularity_rerank=True,
+        popularity_rerank_weight=POPULARITY_RERANK_WEIGHT,
+        exclude_shown=True,
+        ordered_rerank=True,
+        skip_covered_attributes=True,
+    ),
+    # O with the clarification policy's targeted-attribute choice replaced by
+    # an embedding comparison against the near-miss pool (ranks recommendation_
+    # limit..50 of the pre-truncation candidates), instead of the discrete
+    # facet-based information gain _gain() uses. A separate mode, not a flag on
+    # info_gain, so it shares no code with _gain(): see
+    # ClarificationPolicy._embedding_choice. Experimental, not yet dev-gated.
+    #
+    # Named "AA" rather than the last free single letter ("I"): every other
+    # uppercase letter is already spoken for, so this is proposed as the next
+    # value under a spreadsheet-column-style naming scheme (A..Z, then AA, AB,
+    # ...) rather than quietly spending the last single letter. Open question
+    # for the team, not decided here -- see the PR description.
+    "AA": replace(
+        _A,
+        name="AA",
+        retrieval_mode="hybrid",
+        constraint_scoring=True,
+        session_memory=True,
+        clarification="embedding_promotion",
+        dynamic_weights=True,
+        phrase_rerank=True,
+        popularity_rerank=True,
+        popularity_rerank_weight=POPULARITY_RERANK_WEIGHT,
+        exclude_shown=True,
+        ordered_rerank=True,
+    ),
 }
 
 # O+ is Config O with its eight scoring weights fitted rather than guessed. The

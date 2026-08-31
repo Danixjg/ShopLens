@@ -9,11 +9,19 @@ from src.contracts.config import RunConfig
 from src.contracts.response import AskAttribute
 from src.contracts.retrieval import Candidate
 from src.contracts.state import SessionState
+from src.retrieval.dense import DenseRetriever, DenseUnavailable
 
 from .question_value import score_question_values
 
 
 CLARIFICATION_SEQUENCE: tuple[AskAttribute, ...] = ("feature", "material", "color")
+# Reached only once CLARIFICATION_SEQUENCE and "other" are exhausted, so it
+# changes nothing about early-turn attribute choice. Budget is the only
+# addition tested so far; see RunConfig.extended_clarification.
+EXTENDED_CLARIFICATION_SEQUENCE: tuple[AskAttribute, ...] = ("feature", "material", "color", "budget")
+# The near-miss zone "embedding_promotion" compares against: candidates just
+# past the response cutoff, up to this rank, in the pre-truncation pool.
+EMBEDDING_PROMOTION_WINDOW = 50
 
 
 def _satisfies_hard_constraints(candidate: Candidate) -> bool:
@@ -51,6 +59,15 @@ class ClarificationPolicy:
     def __init__(self, config: RunConfig, catalog: Catalog | None = None) -> None:
         self.config = config
         self.catalog = catalog
+        self._sequence = (
+            EXTENDED_CLARIFICATION_SEQUENCE if config.extended_clarification else CLARIFICATION_SEQUENCE
+        )
+        # Lazily built on first use by "embedding_promotion" only, and never
+        # for any other mode. Reuses the on-disk embedding cache the primary
+        # retriever already wrote for this catalog/model/text-recipe, so
+        # building this second instance costs a cache load, not a re-embed.
+        self._embedding_dense: DenseRetriever | None = None
+        self._embedding_dense_attempted = False
 
     @staticmethod
     def _covered(state: SessionState) -> set[str]:
@@ -93,8 +110,13 @@ class ClarificationPolicy:
         return _information_gain(buckets)
 
     def _fixed_choice(self, state: SessionState) -> AskAttribute | None:
-        for attribute in CLARIFICATION_SEQUENCE:
-            if attribute not in state.asked_attributes and attribute not in state.declined_attributes:
+        covered = self._covered(state) if self.config.skip_covered_attributes else set()
+        for attribute in self._sequence:
+            if (
+                attribute not in state.asked_attributes
+                and attribute not in state.declined_attributes
+                and attribute not in covered
+            ):
                 return attribute
         return (
             "other"
@@ -125,10 +147,12 @@ class ClarificationPolicy:
     def _information_choice(
         self, state: SessionState, candidates: list[Candidate], over_general: bool,
     ) -> AskAttribute | None:
+        covered = self._covered(state) if self.config.skip_covered_attributes else set()
         unasked = [
-            attribute for attribute in CLARIFICATION_SEQUENCE
+            attribute for attribute in self._sequence
             if attribute not in state.asked_attributes
             and attribute not in state.declined_attributes
+            and attribute not in covered
         ]
         unasked = self._eligible(unasked, candidates)
         if over_general and unasked:
@@ -157,10 +181,12 @@ class ClarificationPolicy:
         over_general: bool,
         recommendation_limit: int,
     ) -> AskAttribute | None:
+        covered = self._covered(state) if self.config.skip_covered_attributes else set()
         unasked = [
-            attribute for attribute in CLARIFICATION_SEQUENCE
+            attribute for attribute in self._sequence
             if attribute not in state.asked_attributes
             and attribute not in state.declined_attributes
+            and attribute not in covered
         ]
         if self.catalog is not None and unasked:
             values = score_question_values(
@@ -168,7 +194,7 @@ class ClarificationPolicy:
                 self._pool(candidates),
                 active_values={
                     attribute: self._active_values(state, attribute)
-                    for attribute in CLARIFICATION_SEQUENCE
+                    for attribute in self._sequence
                 },
                 recommendation_limit=recommendation_limit,
             )
@@ -187,6 +213,81 @@ class ClarificationPolicy:
             return "other"
         return unasked[0] if over_general and unasked else None
 
+    def _dense_for_embedding_promotion(self) -> DenseRetriever | None:
+        """Build (once) or reuse a DenseRetriever purely for its embedding
+        matrix and encoder, independent of self.catalog's retrieval-mode
+        retriever. This never touches _gain()/_information_gain() or the
+        catalog's discrete facet index -- it is a separate signal entirely.
+        """
+        if self._embedding_dense_attempted:
+            return self._embedding_dense
+        self._embedding_dense_attempted = True
+        if self.catalog is None:
+            return None
+        try:
+            self._embedding_dense = DenseRetriever(
+                self.catalog, text_recipe=self.config.dense_text_recipe,
+            )
+        except DenseUnavailable:
+            self._embedding_dense = None
+        return self._embedding_dense
+
+    def _embedding_choice(
+        self,
+        state: SessionState,
+        candidates: list[Candidate],
+        over_general: bool,
+        recommendation_limit: int,
+    ) -> AskAttribute | None:
+        """Ask about whichever unasked attribute's question text is most
+        similar, by embedding, to the near-miss pool -- candidates ranked
+        recommendation_limit..EMBEDDING_PROMOTION_WINDOW of the pre-truncation
+        pool, the ones just past this turn's response cutoff. The intent is
+        that the answer has the best chance of promoting a real near-miss
+        into next turn's Top-K, without touching Top-K membership itself.
+
+        Only acts on an over-general pool: if the boundary is already sharp
+        there is no ambiguous near-miss zone this mode is meant to target,
+        and it defers to going silent rather than guessing an attribute for
+        a reason unrelated to its own rationale.
+        """
+        if not over_general:
+            return None
+        candidate_attributes: list[AskAttribute] = [
+            attribute for attribute in self._sequence
+            if attribute not in state.asked_attributes
+            and attribute not in state.declined_attributes
+        ]
+        if (
+            "other" not in state.asked_attributes
+            and "other" not in state.declined_attributes
+        ):
+            candidate_attributes.append("other")
+        if not candidate_attributes:
+            return None
+
+        dense = self._dense_for_embedding_promotion()
+        if dense is None:
+            return candidate_attributes[0]
+
+        ordered = sorted(candidates, key=lambda item: (-item.score, item.asin))
+        near_miss = ordered[recommendation_limit:EMBEDDING_PROMOTION_WINDOW]
+        pool_vectors = [
+            vector for vector in (dense.embedding_for(item.asin) for item in near_miss)
+            if vector is not None
+        ]
+        if not pool_vectors:
+            return candidate_attributes[0]
+
+        import numpy as np
+
+        pool_matrix = np.asarray(pool_vectors)
+        texts = [self.message(attribute, over_general=False) for attribute in candidate_attributes]
+        question_vectors = dense.encode_texts(texts)
+        mean_similarity = (question_vectors @ pool_matrix.T).mean(axis=1)
+        best_index = int(np.argmax(mean_similarity))
+        return candidate_attributes[best_index]
+
     def choose(
         self,
         state: SessionState,
@@ -202,6 +303,13 @@ class ClarificationPolicy:
             return self._information_choice(state, candidates, over_general)
         if self.config.clarification == "expected_value":
             return self._expected_value_choice(
+                state,
+                candidates,
+                over_general,
+                recommendation_limit,
+            )
+        if self.config.clarification == "embedding_promotion":
+            return self._embedding_choice(
                 state,
                 candidates,
                 over_general,

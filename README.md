@@ -1,6 +1,6 @@
-# ShopLens
+# TrippyShoppy
 
-ShopLens is a deterministic, offline-first conversational shopping agent for
+TrippyShoppy is a deterministic, offline-first conversational shopping agent for
 the TechJam 2026 conversational-search challenge. It asks a clarification on
 the same turn that it returns up to ten ranked products, remembers disclosed
 constraints, and removes superseded preferences when the shopper changes
@@ -568,6 +568,9 @@ and degrade to BM25 when it is absent.
 | O | N with disclosure-order ranking replacing phrase-rarity reranking inside the frozen Top-10 |
 | O+ | O with its eight scoring weights fitted rather than guessed (experimental; does not change O) |
 | Z | Clarification off, diagnostic only |
+| K | O with the clarification attribute sequence extended by "budget"; experimental, not yet dev-gated |
+| L | O with the clarification policy excluding an attribute already covered by an active disclosed slot; experimental, not yet dev-gated |
+| AA | O with clarification chosen by embedding similarity to the near-miss pool (ranks 11-50) instead of discrete facet information gain; experimental, not yet dev-gated. Named "AA" rather than the last free single letter ("I") -- proposed as the next value under a spreadsheet-column-style scheme (A..Z, then AA, AB, ...); open question for the team, not a unilateral decision. |
 
 O+ leaves every structural choice in O intact and only replaces the eight
 previously-guessed scoring magnitudes with fitted values: the fused-score
