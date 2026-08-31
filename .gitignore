@@ -32,3 +32,6 @@ docs/Wizard_of_Shopping.md
 docs/ProductAgent.md
 # WSL alternate-data-stream artifacts from downloaded files.
 *:Zone.Identifier
+# Local, private developer files that should never be tracked.
+CLAUDE.local.md
+data/SHA256SUMS
