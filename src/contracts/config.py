@@ -61,6 +61,11 @@ class RunConfig:
     # feature/material/color. Only reached once that sequence and "other" are
     # exhausted, so it changes nothing before then.
     extended_clarification: bool = False
+    # Excludes an attribute already covered by an active disclosed slot from
+    # the clarification policy's candidate set, the same way an already-asked
+    # or already-declined attribute is excluded. ClarificationPolicy._covered
+    # computes this set already; this flag is what makes choose() consult it.
+    skip_covered_attributes: bool = False
 
 
 _A = RunConfig()
@@ -291,6 +296,30 @@ CONFIGS: dict[str, RunConfig] = {
         exclude_shown=True,
         ordered_rerank=True,
         extended_clarification=True,
+    ),
+    # Research-derived ablation: O with the clarification policy excluding an
+    # attribute already covered by an active disclosed slot from what it will
+    # ask about next, the same way an already-asked or already-declined
+    # attribute is excluded. Probe evidence (2026-08-31 session) found a
+    # session that discloses feature, material, and color in its opening
+    # message still gets asked "Do you have a feature preference?" -- state
+    # tracking registers the disclosure correctly, but the clarification
+    # policy never consults it. It remains experimental until its dev gate is
+    # run and recorded.
+    "L": replace(
+        _A,
+        name="L",
+        retrieval_mode="hybrid",
+        constraint_scoring=True,
+        session_memory=True,
+        clarification="info_gain",
+        dynamic_weights=True,
+        phrase_rerank=True,
+        popularity_rerank=True,
+        popularity_rerank_weight=POPULARITY_RERANK_WEIGHT,
+        exclude_shown=True,
+        ordered_rerank=True,
+        skip_covered_attributes=True,
     ),
 }
 

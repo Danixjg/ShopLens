@@ -100,8 +100,13 @@ class ClarificationPolicy:
         return _information_gain(buckets)
 
     def _fixed_choice(self, state: SessionState) -> AskAttribute | None:
+        covered = self._covered(state) if self.config.skip_covered_attributes else set()
         for attribute in self._sequence:
-            if attribute not in state.asked_attributes and attribute not in state.declined_attributes:
+            if (
+                attribute not in state.asked_attributes
+                and attribute not in state.declined_attributes
+                and attribute not in covered
+            ):
                 return attribute
         return (
             "other"
@@ -132,10 +137,12 @@ class ClarificationPolicy:
     def _information_choice(
         self, state: SessionState, candidates: list[Candidate], over_general: bool,
     ) -> AskAttribute | None:
+        covered = self._covered(state) if self.config.skip_covered_attributes else set()
         unasked = [
             attribute for attribute in self._sequence
             if attribute not in state.asked_attributes
             and attribute not in state.declined_attributes
+            and attribute not in covered
         ]
         unasked = self._eligible(unasked, candidates)
         if over_general and unasked:
@@ -164,10 +171,12 @@ class ClarificationPolicy:
         over_general: bool,
         recommendation_limit: int,
     ) -> AskAttribute | None:
+        covered = self._covered(state) if self.config.skip_covered_attributes else set()
         unasked = [
             attribute for attribute in self._sequence
             if attribute not in state.asked_attributes
             and attribute not in state.declined_attributes
+            and attribute not in covered
         ]
         if self.catalog is not None and unasked:
             values = score_question_values(
