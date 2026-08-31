@@ -3,11 +3,12 @@
 ## Project description
 
 TrippyShoppy is a deterministic, offline-first conversational shopping agent for
-the TechJam 2026 conversational-search challenge. The current submission,
-configuration `O`, recorded a TechnicalScore of `0.908416` on our 120-session
-development split and `0.898795` on the 80-session exploratory holdout. It runs
-on CPU, uses no hosted model or paid API, and reports zero prompt and completion
-tokens.
+the TechJam 2026 conversational-search challenge. The evaluator defaults to
+configuration `O+`; its parent, configuration `O`, is the latest build with
+reportable evidence and recorded a TechnicalScore of `0.908416` on our
+120-session development split and `0.898795` on the 80-session exploratory
+holdout. It runs on CPU, uses no hosted model or paid API, and reports zero
+prompt and completion tokens.
 
 The organizer calls `Agent.reset(session_id, user_profile)` once and
 `Agent.respond(session_id, user_message, turn, top_k)` on each turn. TrippyShoppy
@@ -49,10 +50,10 @@ specific reason to change it.
    intent-aware weights adjust candidate scores. Hard constraints are bounded
    penalties, never filters. If a detailed query is empty, the agent relaxes to
    its category before using a global fallback.
-6. **Rank the response.** Configuration `O` freezes Top-K membership, orders
+6. **Rank the response.** Configuration `O+` freezes Top-K membership, orders
    candidates by which active disclosures they satisfy, then applies a small,
-   log-bounded rating-count prior inside that same set. The popularity signal
-   cannot add or remove products.
+   log-bounded rating-count prior inside that same set and uses fitted scoring
+   magnitudes. The popularity signal cannot add or remove products.
 7. **Ask the next useful question.** The policy uses normalized information gain
    over live candidate facets, skips attributes the shopper declined, and asks a
    targeted or open clarification alongside the recommendations.
@@ -66,11 +67,12 @@ returning nothing.
 
 ## Submission configuration
 
-An unset `TRIPPYSHOPPY_CONFIG` selects `O`; an unknown value falls back to the
-standard-library baseline `A`. The accuracy-critical `O` path enables hybrid
+An unset `TRIPPYSHOPPY_CONFIG` selects `O+`; an unknown value falls back to the
+standard-library baseline `A`. The accuracy-critical `O+` path enables hybrid
 retrieval, session memory, bounded constraint scoring, dynamic intent weights,
 information-gain clarification, no-repeat recommendations, disclosure-order
-reranking, and the bounded popularity prior.
+reranking, the bounded popularity prior, and O's eight fitted scoring
+magnitudes.
 
 Dense retrieval is optional at runtime. If NumPy, Sentence Transformers, or the
 verified local model cannot load, the retriever degrades to deterministic BM25
@@ -124,6 +126,7 @@ changed accuracy:
 | `Q` | `P` plus a bounded rating-count prior | `0.862083` | `0.880321` (exploratory) |
 | `T` | Previous submission combining `Q` with symmetric intent routing and profile affinity | `0.866774` | `0.891630` (exploratory) |
 | **`O`** | **No-repeat recommendations plus disclosure-order ranking on the `Q` branch** | **`0.908416`** | **`0.898795` (exploratory)** |
+| `O+` | Evaluator default: `O` with eight fitted scoring magnitudes | `0.9189` (diagnostic) | `0.9097` (diagnostic) |
 
 The one-flag `N` diagnostic showed that withholding already scored products
 accounted for most of `O`'s development gain; `N` has no reportable row, so its
@@ -137,7 +140,8 @@ at `6c8135f` tied `O` exactly—HR@10 `0.983333`, MRR `0.844722`, MTTC `2.833333
 and TechnicalScore `0.908416`—so the flag remains off while its property test is
 retained.
 
-Configuration `O` produced the following reportable outcomes:
+Configuration `O` produced the following reportable outcomes; `O+` has no
+reportable row yet, so its figures above remain diagnostic:
 
 | Split | Sessions | HR@10 | MRR | MTTC | TechnicalScore |
 |---|---:|---:|---:|---:|---:|

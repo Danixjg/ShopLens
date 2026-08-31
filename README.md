@@ -647,10 +647,9 @@ route's lexical weight, the match bonus, the material/color/default penalties,
 and the soft-preference decay and floor. They were learned by black-box search
 (random search, then Nelder-Mead) maximising the score, then frozen;
 `scripts/learn_config_o.py` reproduces the fit, and the frozen values and the
-exact training sample ids are documented above `CONFIGS["O+"]`. Because every
-default reproduces O's shipped magnitudes, the graded submission is unchanged
-byte for byte, and a test asserts O's numbers are identical after the weights
-were exposed.
+exact training sample ids are documented above `CONFIGS["O+"]`. O remains
+byte-for-byte unchanged, while the unnamed evaluator path now selects O+; a
+test asserts O's numbers are identical after the weights were exposed.
 
 The weights were fitted on a *random* 120/80 split, not the official stratified
 one. Re-run with the same committed weights on the official deterministic
