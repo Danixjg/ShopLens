@@ -26,6 +26,16 @@
 - [x] Configs R and S remain the clean-holdout alternatives to T, each beating
       P on both splits with untouched holdout rows, and both are published so
       the submission does not report only its strongest number.
+- [ ] Config K fixes disclosure segmentation: a catalog value containing a
+      semicolon is no longer split into several constraints. Its pre-registered
+      dev gate, frozen before the run, is that K must **strictly beat** O's
+      `0.908416`; a tie does not justify moving the submission configuration.
+      Segmentation correctness was measured first and separately, against the
+      simulator's own disclosure list rather than against a score: over-splits
+      fall from 3 to 0 on dev and 3 to 0 on holdout, with under-splits at 0 on
+      both. If the score gate fails, the flag stays off and K is recorded here
+      as a measured rejection beside U and V; the defect fix and its property
+      test are retained either way.
 - [x] Config U was rejected by its pre-registered dev gate and documented;
       holdout was not opened.
 - [x] Config U's clean `87834f4` dev record reports HR@10 `0.941667`, MRR
