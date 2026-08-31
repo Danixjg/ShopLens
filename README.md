@@ -716,6 +716,7 @@ identities currently present in that history contributed as follows:
 | Kivye | Deterministic clarification sequence and starter-agent tests |
 | Danixjg | Stateful BM25 retrieval, override handling, response safeguards, and integration work |
 | MaxLZE | ProductAgent research integration, attribution, and TDD workflow |
+| thaqifrafe | clarification-timing diagnostic tooling, and configurations K and L |
 
 Add the remaining team identities and their exact contributions before the
 submission freeze; no names are inferred where the repository contains none.
