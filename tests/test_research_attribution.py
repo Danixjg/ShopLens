@@ -104,7 +104,7 @@ def test_readme_ablation_table_documents_every_registered_config() -> None:
     """
     text = (ROOT / "README.md").read_text(encoding="utf-8")
     documented = {
-        match.group(1) for match in re.finditer(r"^\| ([A-Z]+) \| ", text, re.MULTILINE)
+        match.group(1) for match in re.finditer(r"^\| ([A-Z]+\+?) \| ", text, re.MULTILINE)
     }
 
     missing = set(CONFIGS) - documented
