@@ -24,11 +24,16 @@ class HybridRetriever:
         dense: Retriever,
         rank_constant: int = 60,
         precision_intents: frozenset[str] = BUYING_PRECISION_INTENTS,
+        precision_lexical_weight: float = 0.75,
     ) -> None:
         self.lexical = lexical
         self.dense = dense
         self.rank_constant = rank_constant
         self.precision_intents = precision_intents
+        # Share of the precision route's score taken from the lexical list; the
+        # fused hybrid list takes the remainder. Exposed so it can be measured
+        # rather than assumed.
+        self.precision_lexical_weight = precision_lexical_weight
 
     def _source_lists(
         self, query: RetrievalQuery, k: int,
@@ -92,8 +97,8 @@ class HybridRetriever:
         scores: dict[str, float] = {}
         components: dict[str, dict[str, float]] = {}
         for name, weight, candidates in (
-            ("buying_lexical_rrf", 0.75, lexical),
-            ("buying_hybrid_rrf", 0.25, hybrid),
+            ("buying_lexical_rrf", self.precision_lexical_weight, lexical),
+            ("buying_hybrid_rrf", 1.0 - self.precision_lexical_weight, hybrid),
         ):
             for rank, candidate in enumerate(candidates, start=1):
                 value = weight / (self.rank_constant + rank)
@@ -128,4 +133,5 @@ def build_retriever(
             if config.symmetric_intent_routing
             else BUYING_PRECISION_INTENTS
         ),
+        precision_lexical_weight=config.precision_lexical_weight,
     )

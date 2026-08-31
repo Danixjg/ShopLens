@@ -9,13 +9,31 @@ from src.retrieval.text import terms
 
 HARD_PENALTIES = {"material": 4.0, "color": 2.0}
 DEFAULT_HARD_PENALTY = 3.0
+MATCH_BONUS = 1.5
+SOFT_DECAY = 0.08
+SOFT_FLOOR = 0.25
 
 
 class ConstraintScorer:
     """Apply recoverable penalties and bonuses; never filter candidates."""
 
-    def __init__(self, catalog: Catalog) -> None:
+    def __init__(
+        self,
+        catalog: Catalog,
+        penalties: dict[str, float] | None = None,
+        default_penalty: float = DEFAULT_HARD_PENALTY,
+        match_bonus: float = MATCH_BONUS,
+        soft_decay: float = SOFT_DECAY,
+        soft_floor: float = SOFT_FLOOR,
+    ) -> None:
         self.catalog = catalog
+        # Defaults reproduce the shipped magnitudes exactly. They are arguments
+        # so the values can be fitted and reported rather than asserted.
+        self.penalties = dict(HARD_PENALTIES if penalties is None else penalties)
+        self.default_penalty = default_penalty
+        self.match_bonus = match_bonus
+        self.soft_decay = soft_decay
+        self.soft_floor = soft_floor
         self._term_cache: dict[str, frozenset[str]] = {}
 
     def _product_terms(self, asin: str) -> frozenset[str]:
@@ -29,7 +47,9 @@ class ConstraintScorer:
 
     def score(self, candidates: list[Candidate], query: RetrievalQuery) -> list[Candidate]:
         rescored: list[Candidate] = []
-        soft_weight = max(0.25, 1.0 - 0.08 * max(0, query.turn_index - 1))
+        soft_weight = max(
+            self.soft_floor, 1.0 - self.soft_decay * max(0, query.turn_index - 1)
+        )
         # Retain every disclosed value but keep one bounded scoring component
         # per attribute. Otherwise two values in the same broad simulator bucket
         # would double an already dominant penalty/bonus scale.
@@ -51,7 +71,11 @@ class ConstraintScorer:
                     bool(wanted) and wanted.issubset(corpus_terms)
                     for wanted in wanted_values
                 )
-                change = 1.5 if matched else -HARD_PENALTIES.get(attribute, DEFAULT_HARD_PENALTY)
+                change = (
+                    self.match_bonus
+                    if matched
+                    else -self.penalties.get(attribute, self.default_penalty)
+                )
                 adjustment += change
                 components[f"hard_{attribute}"] = change
             for attribute, wanted_values in soft_terms.items():
