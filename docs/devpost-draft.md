@@ -240,5 +240,5 @@ specification were published by the TechJam2026 organizer repository identity.
 
 ## Links
 
-- Public repository: [github.com/Danixjg/Shoppy](https://github.com/Danixjg/Shoppy)
+- Public repository: [github.com/Danixjg/TrippyShoppy](https://github.com/Danixjg/TrippyShoppy)
 - Public YouTube demo: [add final public video URL]
