@@ -566,7 +566,7 @@ and degrade to BM25 when it is absent.
 | J | Y with the widened window restricted to per-session evidence, so the popularity and profile priors may reorder a frozen Top-10 but not decide its membership |
 | N | Q plus no-repeat recommendations: an asin already offered and scored is withheld from later turns, and an intent override clears that memory |
 | O | N with disclosure-order ranking replacing phrase-rarity reranking inside the frozen Top-10 |
-| K | O with disclosures segmented against known catalog values, so a field containing a semicolon stays one constraint |
+| M | O with disclosures segmented against known catalog values, so a field containing a semicolon stays one constraint |
 | Z | Clarification off, diagnostic only |
 | K | O with the clarification attribute sequence extended by "budget"; experimental, not yet dev-gated |
 | L | O with the clarification policy excluding an attribute already covered by an active disclosed slot; experimental, not yet dev-gated |
