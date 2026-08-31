@@ -1,0 +1,7 @@
+# Digest-verified assets. The evaluation runner gates every reportable run on
+# the byte digests of the model tree, the catalog and the public dataset. Git's
+# autocrlf rewrites LF to CRLF on checkout under Windows, which changes those
+# bytes and fails the gate before a single session runs. Mark these paths as
+# non-text so the working tree matches the index exactly on every platform.
+models/** -text
+data/*.jsonl -text
