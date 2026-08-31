@@ -144,7 +144,7 @@ def test_every_tracked_document_link_resolves_in_a_fresh_clone() -> None:
 
 RESULTS_LOG = ROOT / "results.jsonl"
 CLEAN_HOLDOUT_CONFIGS = ("P", "R", "S")
-EXPLORATORY_HOLDOUT_CONFIGS = ("Q", "T")
+EXPLORATORY_HOLDOUT_CONFIGS = ("Q", "T", "O")
 
 
 def _reported_score(config: str, split: str) -> str:
