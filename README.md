@@ -1,6 +1,6 @@
-# ShopLens
+# TrippyShoppy
 
-ShopLens is a deterministic, offline-first conversational shopping agent for
+TrippyShoppy is a deterministic, offline-first conversational shopping agent for
 the TechJam 2026 conversational-search challenge. It asks a clarification on
 the same turn that it returns up to ten ranked products, remembers disclosed
 constraints, and removes superseded preferences when the shopper changes
