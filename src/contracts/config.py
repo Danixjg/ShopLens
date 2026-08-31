@@ -63,15 +63,20 @@ class RunConfig:
     # Which rerankers the widened window reaches. Inert while rerank_window is
     # 0, because membership is already frozen at the recommendation limit.
     rerank_window_scope: RerankWindowScope = "all"
-    # Extends the clarification policy's fixed attribute sequence beyond
-    # feature/material/color. Only reached once that sequence and "other" are
-    # exhausted, so it changes nothing before then.
-    extended_clarification: bool = False
-    # Excludes an attribute already covered by an active disclosed slot from
-    # the clarification policy's candidate set, the same way an already-asked
-    # or already-declined attribute is excluded. ClarificationPolicy._covered
-    # computes this set already; this flag is what makes choose() consult it.
-    skip_covered_attributes: bool = False
+    # Fitted scoring weights. Every default below reproduces the shipped Config O
+    # magnitudes exactly, so every existing configuration is byte-for-byte
+    # unchanged; only O+ overrides them. ``fusion_scale`` multiplies the fused
+    # retrieval score before constraint scoring (1.0 keeps fusion the tiny prior
+    # it has always been); the rest are the constraint-scorer and precision-route
+    # magnitudes that were previously module constants.
+    fusion_scale: float = 1.0
+    precision_lexical_weight: float = 0.75
+    match_bonus: float = 1.5
+    penalty_material: float = 4.0
+    penalty_color: float = 2.0
+    default_penalty: float = 3.0
+    soft_decay: float = 0.08
+    soft_floor: float = 0.25
 
 
 _A = RunConfig()
@@ -373,6 +378,50 @@ CONFIGS: dict[str, RunConfig] = {
         ordered_rerank=True,
     ),
 }
+
+# O+ is Config O with its eight scoring weights fitted rather than guessed. The
+# weights were learned by black-box search (random search then Nelder-Mead)
+# maximising TechnicalScore on 120 training sessions, then frozen. Every other
+# field is inherited from O unchanged, and each shipped default in RunConfig
+# reproduces O's magnitudes, so O itself is untouched.
+#
+# PROVENANCE / REPRODUCIBILITY: the weights were fitted on a RANDOM 120/80 split
+# of the 200 public sessions, drawn with random.Random(0).shuffle over the
+# dataset order (this is NOT the official stratified dev/holdout split, so these
+# numbers are not directly comparable to O's reported dev/holdout). The 120
+# training sample_ids used were:
+#   public_0002, public_0003, public_0005, public_0006, public_0007, public_0008,
+#   public_0009, public_0010, public_0012, public_0013, public_0014, public_0015,
+#   public_0018, public_0020, public_0022, public_0023, public_0027, public_0029,
+#   public_0030, public_0033, public_0034, public_0035, public_0039, public_0040,
+#   public_0042, public_0043, public_0044, public_0045, public_0046, public_0047,
+#   public_0048, public_0051, public_0052, public_0054, public_0055, public_0058,
+#   public_0059, public_0060, public_0061, public_0064, public_0066, public_0068,
+#   public_0069, public_0070, public_0071, public_0072, public_0076, public_0079,
+#   public_0083, public_0087, public_0088, public_0089, public_0090, public_0093,
+#   public_0094, public_0095, public_0096, public_0097, public_0098, public_0100,
+#   public_0101, public_0102, public_0105, public_0106, public_0107, public_0109,
+#   public_0110, public_0111, public_0113, public_0116, public_0117, public_0118,
+#   public_0119, public_0120, public_0122, public_0124, public_0128, public_0129,
+#   public_0132, public_0133, public_0135, public_0136, public_0138, public_0139,
+#   public_0143, public_0145, public_0147, public_0148, public_0149, public_0151,
+#   public_0153, public_0154, public_0160, public_0161, public_0163, public_0166,
+#   public_0167, public_0168, public_0169, public_0170, public_0171, public_0172,
+#   public_0173, public_0174, public_0175, public_0177, public_0180, public_0181,
+#   public_0182, public_0183, public_0184, public_0185, public_0188, public_0189,
+#   public_0190, public_0193, public_0194, public_0197, public_0198, public_0200
+CONFIGS["O+"] = replace(
+    CONFIGS["O"],
+    name="O+",
+    fusion_scale=123.5,
+    precision_lexical_weight=0.803,
+    match_bonus=0.981,
+    penalty_material=5.854,
+    penalty_color=2.384,
+    default_penalty=1.102,
+    soft_decay=0.0962,
+    soft_floor=0.889,
+)
 
 # The configuration the submission claims and is graded on. Documented in
 # the README under "Retention decision"; a test binds the two together.

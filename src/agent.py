@@ -58,7 +58,19 @@ class Agent:
             build_constraint_index=self.config.catalog_grounded_segmentation,
         )
         self.retriever = build_retriever(self.catalog, self.config)
-        self.constraint_scorer = ConstraintScorer(self.catalog)
+        # Constraint magnitudes come from the config so a fitted variant (O+)
+        # can override them; the defaults reproduce the shipped magnitudes.
+        self.constraint_scorer = ConstraintScorer(
+            self.catalog,
+            penalties={
+                "material": self.config.penalty_material,
+                "color": self.config.penalty_color,
+            },
+            default_penalty=self.config.default_penalty,
+            match_bonus=self.config.match_bonus,
+            soft_decay=self.config.soft_decay,
+            soft_floor=self.config.soft_floor,
+        )
         self.dynamic_scorer = DynamicWeightScorer()
         self.reranker = (
             LocalCrossEncoderReranker(self.catalog)
@@ -198,6 +210,14 @@ class Agent:
             filtered = [item for item in candidates if item.asin not in query.exclude]
             if filtered:
                 candidates = filtered
+        if self.config.fusion_scale != 1.0:
+            # Amplify the fused retrieval score before constraint scoring so it
+            # competes with the constraint magnitudes rather than being a
+            # negligible prior. 1.0 (every config except O+) is a no-op.
+            candidates = [
+                Candidate(item.asin, item.score * self.config.fusion_scale, item.components)
+                for item in candidates
+            ]
         if self.config.constraint_scoring:
             candidates = self.constraint_scorer.score(candidates, query)
         if self.config.dynamic_weights:

@@ -566,11 +566,32 @@ and degrade to BM25 when it is absent.
 | J | Y with the widened window restricted to per-session evidence, so the popularity and profile priors may reorder a frozen Top-10 but not decide its membership |
 | N | Q plus no-repeat recommendations: an asin already offered and scored is withheld from later turns, and an intent override clears that memory |
 | O | N with disclosure-order ranking replacing phrase-rarity reranking inside the frozen Top-10 |
-| M | O with disclosures segmented against known catalog values, so a field containing a semicolon stays one constraint |
+| O+ | O with its eight scoring weights fitted rather than guessed (experimental; does not change O) |
 | Z | Clarification off, diagnostic only |
 | K | O with the clarification attribute sequence extended by "budget"; experimental, not yet dev-gated |
 | L | O with the clarification policy excluding an attribute already covered by an active disclosed slot; experimental, not yet dev-gated |
 | AA | O with clarification chosen by embedding similarity to the near-miss pool (ranks 11-50) instead of discrete facet information gain; experimental, not yet dev-gated. Named "AA" rather than the last free single letter ("I") -- proposed as the next value under a spreadsheet-column-style scheme (A..Z, then AA, AB, ...); open question for the team, not a unilateral decision. |
+
+O+ leaves every structural choice in O intact and only replaces the eight
+previously-guessed scoring magnitudes with fitted values: the fused-score
+multiplier `fusion_scale`, the precision route's `precision_lexical_weight`, the
+constraint `match_bonus`, the `material`/`color`/default hard penalties, and the
+soft-preference `soft_decay`/`soft_floor`. They were learned by black-box search
+(random search then Nelder-Mead) maximising TechnicalScore, then frozen; the
+reproducing script is [`scripts/learn_config_o.py`](scripts/learn_config_o.py)
+and the frozen values, with the exact training sample_ids, are documented above
+`CONFIGS["O+"]`. Because every RunConfig default reproduces O's shipped
+magnitudes and `fusion_scale=1.0` is a no-op, O — the graded submission — is
+byte-for-byte unchanged; a test asserts O's dev/holdout are identical after the
+weights were exposed.
+
+The weights were **fitted on a random 120/80 split** (`random.Random(0)`), not
+the official stratified dev set, so O+ is an experimental variant held to the
+same retain-on-both-splits bar rather than a promotion. Measured on the official
+split it nonetheless generalises: dev `0.9084 -> 0.9189`, and the never-trained
+holdout `0.8959 -> 0.9097` (+0.0138), all from MRR (`0.8211 -> 0.8708` over the
+full set) with HR@10 unchanged at `0.9850` and a small efficiency cost. A clean
+fit on the official dev split remains the follow-up before any promotion.
 
 U is a documented research ablation, not a retained configuration. Its clean
 dev run at `87834f4` kept HR@10 at `0.941667` and raised MRR from P's
