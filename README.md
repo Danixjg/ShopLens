@@ -575,44 +575,9 @@ holdout `0.8959 -> 0.9097` (+0.0138), all from MRR (`0.8211 -> 0.8708` over the
 full set) with HR@10 unchanged at `0.9850` and a small efficiency cost. A clean
 fit on the official dev split remains the follow-up before any promotion.
 
-U is a documented research ablation, not a retained configuration. Its clean
-dev run at `87834f4` kept HR@10 at `0.941667` and raised MRR from P's
-`0.639239` to `0.641323`, but MTTC moved from `3.133333` to `3.175000`.
-TechnicalScore therefore fell from `0.819939` to `0.819730` (`-0.000209`),
-missing the pre-registered retention gate. U was rejected without opening
-holdout; the reportable dev record remains in `results.jsonl`. U independently
-adapts the paper's EVPI idea into a target-free expected Top-K posterior-mass
-gain over catalog-facet answers. Sparse or missing facets and free-form answers
-outside those catalog proxies limit what the score can represent.
-
-V has now been **measured once on dev**. It is P with only clarification facet
-eligibility changed: a facet is asked only when at least one candidate in the
-live pool can answer it, with an unconditional fallback so the agent never
-loses the ability to ask. The change is inert without a catalog and cannot
-alter retrieval, scoring, or Top-10 membership. Its retention gate was frozen
-in [the TDD record](docs/testing/facet-population-gate.tdd.md) before the run.
-The reportable dev row at `547bdb1` tied P exactly at `0.819939` on every
-metric, every scenario, and the turn count, so V cleared its gate only by a tie
-and was not kept; holdout was never opened. The cause is measurable rather than
-mysterious: the gate drops a facet only when no candidate in the pool carries
-it, and `feature`, which is asked first, is populated on 99.43% of the
-50,000-product catalog.
-
-Q uses only the immutable organizer catalog. For each member of P's frozen
-Top-10 it log-scales `rating_number` against the catalog maximum and adds
-`0.15 * popularity / 61` to the existing P score. It then reorders those same
-identifiers deterministically. The prior cannot change HitRate@10 or MTTC; it
-is an ordering aid, never a retrieval filter or a replacement for
-disclosed-constraint evidence.
-
 The evaluator reports HR@10, MRR, MTTC, efficiency, the recommended composite,
 and the same metrics per scenario. Changes should be retained only after gains
 on both dev and holdout without a severe scenario regression.
-
-The policy reads immutable catalog facets for the live candidate pool without
-expanding the frozen `Candidate` contract. G still requires a specific vendored
-cross-encoder that the plan does not name; H remains conditional on a specified
-provider. Neither is claimed as completed.
 
 ## Cost, latency, and network disclosure
 
@@ -695,8 +660,7 @@ identities currently present in that history contributed as follows:
 | Repository identity | Contribution visible in history |
 |---|---|
 | TechJam2026 | Participant kit, evaluator contract, public dataset, and competition documentation |
-| Kivye | Deterministic clarification sequence and starter-agent tests |
-| Danixjg | Stateful BM25 retrieval, override handling, response safeguards, and integration work |
+| Kivye | Deterministic clarification sequence, starter-agent tests and Stateful BM25 retrieval |
 | MaxLZE | ProductAgent research integration, attribution, and TDD workflow |
 | thaqifrafe | clarification-timing diagnostic tooling, and configurations K and L |
 
