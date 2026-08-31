@@ -270,7 +270,7 @@ CONFIGS: dict[str, RunConfig] = {
 
 # The configuration the submission claims and is graded on. Documented in
 # the README under "Retention decision"; a test binds the two together.
-SUBMISSION_CONFIG_NAME = "T"
+SUBMISSION_CONFIG_NAME = "O"
 
 
 def get_run_config(name: str | None = None) -> RunConfig:

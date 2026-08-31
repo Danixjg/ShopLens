@@ -42,7 +42,12 @@ def model_tree_sha256(path: str | Path) -> str:
         elif not item.is_dir():
             raise ValueError(f"model tree contains a non-regular entry: {item}")
     digest = hashlib.sha256()
-    for file_path in sorted(files):
+    # Order by case-sensitive relative parts rather than by Path comparison.
+    # WindowsPath compares case-folded while PosixPath does not, so the same
+    # byte-identical tree would otherwise hash differently off Linux and every
+    # check there would report a false mismatch indistinguishable from content
+    # corruption. The relative parts are what the digest already commits to.
+    for file_path in sorted(files, key=lambda item: item.relative_to(root_path).parts):
         relative = file_path.relative_to(root_path).as_posix()
         rel_bytes = relative.encode("utf-8")
         digest.update(len(rel_bytes).to_bytes(4, "big"))
