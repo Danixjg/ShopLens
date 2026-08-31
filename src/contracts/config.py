@@ -47,6 +47,10 @@ class RunConfig:
     facet_population_gate: bool = False
     exclude_shown: bool = False
     ordered_rerank: bool = False
+    # Resolve a disclosure against known catalog field values rather than
+    # splitting on every semicolon. Catalog text uses ";" as punctuation, so
+    # the separator is not reserved and one value can look like several.
+    catalog_grounded_segmentation: bool = False
     popularity_rerank_weight: float = 0.0
     profile_rerank_weight: float = 0.0
     dense_text_recipe: DenseTextRecipe = "full"
@@ -273,6 +277,25 @@ CONFIGS: dict[str, RunConfig] = {
         popularity_rerank_weight=POPULARITY_RERANK_WEIGHT,
         exclude_shown=True,
         ordered_rerank=True,
+    ),
+    # O with catalog-grounded disclosure segmentation. A feature bullet that
+    # contains a semicolon currently becomes several slots, which inflates the
+    # ordered-rerank match vector and dilutes the soft-term union that scores
+    # it. Isolating the flag keeps the effect measurable against O.
+    "K": replace(
+        _A,
+        name="K",
+        retrieval_mode="hybrid",
+        constraint_scoring=True,
+        session_memory=True,
+        clarification="info_gain",
+        dynamic_weights=True,
+        phrase_rerank=True,
+        popularity_rerank=True,
+        popularity_rerank_weight=POPULARITY_RERANK_WEIGHT,
+        exclude_shown=True,
+        ordered_rerank=True,
+        catalog_grounded_segmentation=True,
     ),
     "Z": replace(_A, name="Z", clarification="off"),
     # Research-derived ablation: O with the clarification policy's fixed

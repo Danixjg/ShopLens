@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Iterator
 
 from src.attributes import ANSWERABLE_COLORS, MATERIALS, classify_attribute, normalize_ascii
+from src.parsing.segmentation import constraint_candidates, index_key
 
 
 SEARCH_FIELDS = ("title", "features", "details", "description", "categories", "store")
@@ -190,10 +191,14 @@ class Catalog:
         expected_sha256: str | None = None,
         *,
         build_facets: bool = True,
+        build_constraint_index: bool = False,
     ) -> None:
         self.path = Path(path).resolve()
         records: list[_CatalogRecord] = []
         seen: set[str] = set()
+        # Accumulated inside the existing pass: the loop already decodes and
+        # parses every record, so the index costs no extra read.
+        constraint_keys: set[int] = set()
         digest = hashlib.sha256()
         # Hash the exact byte stream being parsed.  This avoids a check/use race
         # between a separate checksum pass and catalog construction.
@@ -213,6 +218,10 @@ class Catalog:
                 if asin in seen:
                     raise ValueError(f"duplicate parent_asin in catalog: {asin}")
                 seen.add(asin)
+                if build_constraint_index:
+                    constraint_keys.update(
+                        index_key(value) for value in constraint_candidates(raw)
+                    )
                 product_facets = _raw_facets(_raw_entries(raw)) if build_facets else ()
                 raw_price = raw.get("price")
                 raw_rating = raw.get("average_rating")
@@ -238,6 +247,9 @@ class Catalog:
         self.sha256 = actual
         self._records = tuple(records)
         self._by_asin = {record.product.parent_asin: record for record in records}
+        self.constraint_index: frozenset[int] | None = (
+            frozenset(constraint_keys) if build_constraint_index else None
+        )
 
     def __len__(self) -> int:
         return len(self._records)

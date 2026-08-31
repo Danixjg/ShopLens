@@ -5,6 +5,8 @@ import re
 from src.attributes import classify_attribute
 from src.contracts.parsing import ParsedTurn
 
+from .segmentation import segment
+
 
 OVERRIDE_MARKER = "Actually, ignore my earlier preference. What I need is:"
 _BUYING_MARKER = ". A key requirement is:"
@@ -32,6 +34,11 @@ def _category_from_initial(message: str) -> str | None:
 
 class TurnParser:
     """Deterministically parse the simulator's controlled customer language."""
+
+    def __init__(self, constraint_index: frozenset[int] | None = None) -> None:
+        # Without an index, disclosures split on every semicolon, which is the
+        # historical behaviour.
+        self.constraint_index = constraint_index
 
     def parse(self, user_message: str, turn: int) -> ParsedTurn:
         message = str(user_message).strip()
@@ -67,7 +74,7 @@ class TurnParser:
                 values.append(value)
         elif _DISCLOSURE_MARKER in message:
             disclosed = message.split(_DISCLOSURE_MARKER, 1)[1].strip(" .")
-            values.extend(item.strip(" .") for item in disclosed.split(";") if item.strip(" ."))
+            values.extend(segment(disclosed, self.constraint_index))
         elif category is not None and ". " in message:
             free_text = message.split(". ", 1)[1].strip(" .")
             if free_text:
