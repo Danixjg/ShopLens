@@ -379,6 +379,7 @@ and degrade to BM25 when it is absent.
 | N | Q plus no-repeat recommendations: an asin already offered and scored is withheld from later turns, and an intent override clears that memory |
 | O | N with disclosure-order ranking replacing phrase-rarity reranking inside the frozen Top-10 |
 | Z | Clarification off, diagnostic only |
+| K | O with the clarification attribute sequence extended by "budget"; experimental, not yet dev-gated |
 
 U is a documented research ablation, not a retained configuration. Its clean
 dev run at `87834f4` kept HR@10 at `0.941667` and raised MRR from P's

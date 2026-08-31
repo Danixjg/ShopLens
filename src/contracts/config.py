@@ -57,6 +57,10 @@ class RunConfig:
     # Which rerankers the widened window reaches. Inert while rerank_window is
     # 0, because membership is already frozen at the recommendation limit.
     rerank_window_scope: RerankWindowScope = "all"
+    # Extends the clarification policy's fixed attribute sequence beyond
+    # feature/material/color. Only reached once that sequence and "other" are
+    # exhausted, so it changes nothing before then.
+    extended_clarification: bool = False
 
 
 _A = RunConfig()
@@ -266,6 +270,28 @@ CONFIGS: dict[str, RunConfig] = {
         ordered_rerank=True,
     ),
     "Z": replace(_A, name="Z", clarification="off"),
+    # Research-derived ablation: O with the clarification policy's fixed
+    # attribute sequence extended by "budget" only, reached once
+    # feature/material/color/other are exhausted. 178/200 public-set target
+    # products carry a usable price (materialize_hidden_fields derives a
+    # budget soft preference only then), so a shopper can usually answer it,
+    # even though catalog-wide price coverage is much sparser. It remains
+    # experimental until its dev gate is run and recorded.
+    "K": replace(
+        _A,
+        name="K",
+        retrieval_mode="hybrid",
+        constraint_scoring=True,
+        session_memory=True,
+        clarification="info_gain",
+        dynamic_weights=True,
+        phrase_rerank=True,
+        popularity_rerank=True,
+        popularity_rerank_weight=POPULARITY_RERANK_WEIGHT,
+        exclude_shown=True,
+        ordered_rerank=True,
+        extended_clarification=True,
+    ),
 }
 
 # The configuration the submission claims and is graded on. Documented in
