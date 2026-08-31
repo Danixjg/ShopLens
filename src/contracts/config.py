@@ -8,6 +8,14 @@ from typing import Literal
 RetrievalMode = Literal["bm25", "dense", "hybrid"]
 ClarificationMode = Literal["off", "empty_result_only", "info_gain", "expected_value"]
 RerankerMode = Literal["none", "local_cross_encoder"]
+# What the dense encoder indexes. "full" is the historical flat concatenation;
+# "compact" keeps only the fields the BM25 index already weights highest.
+DenseTextRecipe = Literal["full", "compact"]
+# Which signals a widened rerank window exposes. "all" is the historical
+# behaviour, where every reranker sees the window and may therefore decide
+# Top-K membership. "evidence" freezes membership once the disclosure-derived
+# rerankers have run, so the population-level priors may only reorder inside it.
+RerankWindowScope = Literal["all", "evidence"]
 
 HIT_RATE_WEIGHT = 0.50
 MRR_WEIGHT = 0.30
@@ -41,6 +49,14 @@ class RunConfig:
     ordered_rerank: bool = False
     popularity_rerank_weight: float = 0.0
     profile_rerank_weight: float = 0.0
+    dense_text_recipe: DenseTextRecipe = "full"
+    negative_preference: bool = False
+    # Candidates handed to the rerankers before truncation. 0 keeps Top-K
+    # membership frozen, which is the historical behaviour.
+    rerank_window: int = 0
+    # Which rerankers the widened window reaches. Inert while rerank_window is
+    # 0, because membership is already frozen at the recommendation limit.
+    rerank_window_scope: RerankWindowScope = "all"
 
 
 _A = RunConfig()
@@ -133,6 +149,86 @@ CONFIGS: dict[str, RunConfig] = {
         dynamic_weights=True,
         phrase_rerank=True,
         facet_population_gate=True,
+    ),
+    # Research-derived ablation: T with only the dense encoder's input text
+    # changed. The lexical index already weights title, categories and features
+    # highest and the low-weight tails overflow the encoder's 256 word-piece
+    # window, so this measures whether the dense half was being diluted.
+    "W": replace(
+        _A,
+        name="W",
+        retrieval_mode="hybrid",
+        constraint_scoring=True,
+        session_memory=True,
+        clarification="info_gain",
+        dynamic_weights=True,
+        phrase_rerank=True,
+        symmetric_intent_routing=True,
+        profile_rerank=True,
+        profile_rerank_weight=PROFILE_RERANK_WEIGHT,
+        popularity_rerank=True,
+        popularity_rerank_weight=POPULARITY_RERANK_WEIGHT,
+        dense_text_recipe="compact",
+    ),
+    # Research-derived ablation: T with only overridden-preference exclusion
+    # added. A value the shopper replaces is rejected information; without this
+    # the retrieval seam cannot tell it from a value never mentioned.
+    "X": replace(
+        _A,
+        name="X",
+        retrieval_mode="hybrid",
+        constraint_scoring=True,
+        session_memory=True,
+        clarification="info_gain",
+        dynamic_weights=True,
+        phrase_rerank=True,
+        symmetric_intent_routing=True,
+        profile_rerank=True,
+        profile_rerank_weight=PROFILE_RERANK_WEIGHT,
+        popularity_rerank=True,
+        popularity_rerank_weight=POPULARITY_RERANK_WEIGHT,
+        negative_preference=True,
+    ),
+    # Research-derived ablation: T with only the rerank window widened, so the
+    # existing rerankers may decide Top-10 membership instead of only its order.
+    # Phase 0 measured three dev misses within 0.002 of the tenth-place score,
+    # which no post-truncation reranker could ever reach.
+    "Y": replace(
+        _A,
+        name="Y",
+        retrieval_mode="hybrid",
+        constraint_scoring=True,
+        session_memory=True,
+        clarification="info_gain",
+        dynamic_weights=True,
+        phrase_rerank=True,
+        symmetric_intent_routing=True,
+        profile_rerank=True,
+        profile_rerank_weight=PROFILE_RERANK_WEIGHT,
+        popularity_rerank=True,
+        popularity_rerank_weight=POPULARITY_RERANK_WEIGHT,
+        rerank_window=50,
+    ),
+    # Research-derived ablation: Y with only the widened window's scope
+    # narrowed. Popularity and profile are population-level priors whose values
+    # were fitted across sessions, not evidence about this shopper; they may
+    # break ties inside a frozen Top-K but may not decide who is in it.
+    "J": replace(
+        _A,
+        name="J",
+        retrieval_mode="hybrid",
+        constraint_scoring=True,
+        session_memory=True,
+        clarification="info_gain",
+        dynamic_weights=True,
+        phrase_rerank=True,
+        symmetric_intent_routing=True,
+        profile_rerank=True,
+        profile_rerank_weight=PROFILE_RERANK_WEIGHT,
+        popularity_rerank=True,
+        popularity_rerank_weight=POPULARITY_RERANK_WEIGHT,
+        rerank_window=50,
+        rerank_window_scope="evidence",
     ),
     # Q plus no-repeat recommendations. Every asin returned is scored, so a turn
     # that did not end the session proves none of them was the target; they are

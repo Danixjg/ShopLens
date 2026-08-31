@@ -324,6 +324,10 @@ and degrade to BM25 when it is absent.
 | T | R, S, and Q combined, to measure whether the three compose |
 | U | P plus deterministic expected-question-value clarification |
 | V | P plus catalog-population gating of clarification facets |
+| W | T with the dense encoder indexing title, categories and features only |
+| X | T plus suppression of a preference the shopper replaced on override |
+| Y | T with reranking applied to the top 50 before truncation, so it can change Top-10 membership |
+| J | Y with the widened window restricted to per-session evidence, so the popularity and profile priors may reorder a frozen Top-10 but not decide its membership |
 | N | Q plus no-repeat recommendations: an asin already offered and scored is withheld from later turns, and an intent override clears that memory |
 | O | N with disclosure-order ranking replacing phrase-rarity reranking inside the frozen Top-10 |
 | Z | Clarification off, diagnostic only |

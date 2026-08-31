@@ -23,6 +23,19 @@ from src.scoring import (
 from src.state import apply_parsed_turn, build_retrieval_query
 
 
+def rerank_window_size(recommendation_limit: int, window: int) -> int:
+    """How many candidates the rerankers may reorder before final truncation.
+
+    A window of zero keeps the historical behaviour, where membership is frozen
+    at the recommendation limit and reranking can only reorder what already
+    survived. A wider window lets a rerank signal recover a product that lost
+    the cut by a hairline, which is the only way reranking can move HitRate@10.
+    A window narrower than the limit is clamped up, so a misconfigured value can
+    never return fewer products than asked for.
+    """
+    return max(int(recommendation_limit), int(window))
+
+
 class Agent:
     """Offline, stateful ShopLens implementation of the organizer contract."""
 
@@ -148,7 +161,9 @@ class Agent:
             for slot in state.slots:
                 slot.active = False
         apply_parsed_turn(state, parsed, str(user_message), safe_turn)
-        query = build_retrieval_query(state)
+        query = build_retrieval_query(
+            state, exclude_superseded=self.config.negative_preference,
+        )
 
         depth = max(50, safe_k * 10) if self.config.constraint_scoring else safe_k
         candidates = self._search(state, query, depth)
@@ -180,7 +195,8 @@ class Agent:
         over_general = self.policy.is_over_general(pool, safe_k)
         # Reranking may improve reciprocal rank but must not change Top-K
         # membership and therefore Hit Rate@10.
-        candidates = sorted(candidates, key=lambda item: (-item.score, item.asin))[:safe_k]
+        window = rerank_window_size(safe_k, self.config.rerank_window)
+        candidates = sorted(candidates, key=lambda item: (-item.score, item.asin))[:window]
         if self.reranker is not None:
             candidates = self.reranker.rerank(query, candidates)
         if self.ordered_reranker is not None:
@@ -189,12 +205,23 @@ class Agent:
             candidates = self.ordered_reranker.rerank(state, candidates)
         elif self.phrase_reranker is not None:
             candidates = self.phrase_reranker.rerank(state, candidates, pool)
+        if self.config.rerank_window_scope == "evidence":
+            # Freeze membership before the population-level priors. Popularity
+            # and profile weights were fitted across sessions, so they are not
+            # evidence about this shopper: they may reorder a Top-K the
+            # disclosures already chose, but may not decide who is in it. A
+            # no-op unless the window is wider than the recommendation limit.
+            candidates = candidates[:safe_k]
         if self.popularity_reranker is not None:
             candidates = self.popularity_reranker.rerank(candidates)
         if self.profile_reranker is not None:
             # Applied last and inside frozen membership: the supplied profile may
             # break a tie the disclosed constraints left open, never outrank them.
             candidates = self.profile_reranker.rerank(state, candidates)
+        # Truncate last: with the default window this is a no-op, and with a
+        # wider one it is the point where reranking is allowed to decide
+        # membership rather than only order.
+        candidates = candidates[:safe_k]
 
         asins = [item.asin for item in candidates]
         if not asins:

@@ -10,12 +10,12 @@ import time
 import zipfile
 from pathlib import Path
 
-from src.catalog import Catalog
+from src.catalog import Catalog, dense_text
 from src.contracts.retrieval import Candidate, RetrievalQuery
 
 
 MODEL_REVISION = "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
-CACHE_SCHEMA_VERSION = 2
+CACHE_SCHEMA_VERSION = 3
 OFFICIAL_DEVICE = "cpu"
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 OFFICIAL_MODEL_PATH = REPOSITORY_ROOT / "models/all-MiniLM-L6-v2"
@@ -74,6 +74,31 @@ def _distribution_version(name: str) -> str | None:
         return None
 
 
+def cache_fingerprint(
+    *,
+    catalog_sha256: str,
+    model_sha256: str,
+    model_revision: str,
+    runtime_signature: str,
+    text_recipe: str,
+) -> tuple[int, str, str, str, str, str]:
+    """Everything that must match for cached vectors to be reusable.
+
+    ``text_recipe`` is part of the identity because the cache stores vectors,
+    not the text they came from. Without it a recipe change reuses embeddings
+    built from the previous text and the run measures the old recipe under the
+    new config's name.
+    """
+    return (
+        CACHE_SCHEMA_VERSION,
+        catalog_sha256,
+        model_sha256,
+        model_revision,
+        runtime_signature,
+        text_recipe,
+    )
+
+
 def encoder_runtime_signature(device: str = OFFICIAL_DEVICE) -> str:
     """Stable cache provenance for the code that creates/query-encodes vectors."""
     payload = {
@@ -96,6 +121,7 @@ class DenseRetriever:
         catalog: Catalog,
         model_path: str | Path = OFFICIAL_MODEL_PATH,
         cache_path: str | Path | None = None,
+        text_recipe: str = "full",
     ) -> None:
         requested_model = Path(model_path)
         if not requested_model.is_absolute():
@@ -159,6 +185,14 @@ class DenseRetriever:
         self.catalog_sha256 = catalog_digest
         self.model_sha256 = model_digest
         self.runtime_signature = runtime_signature
+        self.text_recipe = text_recipe
+        expected_fingerprint = cache_fingerprint(
+            catalog_sha256=catalog_digest,
+            model_sha256=model_digest,
+            model_revision=MODEL_REVISION,
+            runtime_signature=runtime_signature,
+            text_recipe=text_recipe,
+        )
         self.cache_path = cache.resolve()
         self.cache_sha256: str | None = None
         self.embeddings_sha256: str | None = None
@@ -175,12 +209,16 @@ class DenseRetriever:
                 with np.load(cache, allow_pickle=False) as saved:
                     cached_asins = [str(item) for item in saved["asins"].tolist()]
                     embeddings = saved["embeddings"]
+                    saved_fingerprint = cache_fingerprint(
+                        catalog_sha256=str(saved["catalog_sha256"].item()),
+                        model_sha256=str(saved["model_sha256"].item()),
+                        model_revision=str(saved["model_revision"].item()),
+                        runtime_signature=str(saved["runtime_signature"].item()),
+                        text_recipe=str(saved["text_recipe"].item()),
+                    )
                     valid = (
                         int(saved["schema_version"].item()) == CACHE_SCHEMA_VERSION
-                        and str(saved["catalog_sha256"].item()) == catalog_digest
-                        and str(saved["model_sha256"].item()) == model_digest
-                        and str(saved["model_revision"].item()) == MODEL_REVISION
-                        and str(saved["runtime_signature"].item()) == runtime_signature
+                        and saved_fingerprint == expected_fingerprint
                         and cached_asins == self._asins
                         and embeddings.ndim == 2
                         and embeddings.shape == (len(self._asins), dimension)
@@ -195,7 +233,7 @@ class DenseRetriever:
                 # it must never make the offline fallback unusable.
                 self._embeddings = None
         if self._embeddings is None:
-            texts = [product.searchable_text for product in catalog]
+            texts = [dense_text(product, text_recipe) for product in catalog]
             generated = self._model.encode(
                 texts,
                 batch_size=128,
@@ -225,6 +263,7 @@ class DenseRetriever:
                         model_sha256=np.asarray(model_digest),
                         model_revision=np.asarray(MODEL_REVISION),
                         runtime_signature=np.asarray(runtime_signature),
+                        text_recipe=np.asarray(text_recipe),
                         embeddings=self._embeddings,
                         asins=np.asarray(self._asins),
                     )
@@ -253,6 +292,7 @@ class DenseRetriever:
             "catalog_sha256": self.catalog_sha256,
             "model_sha256": self.model_sha256,
             "runtime_signature": self.runtime_signature,
+            "text_recipe": self.text_recipe,
             "rebuilt_in_process": self.rebuilt_in_process,
             "official_model_verified": self.official_model_verified,
             "trusted_for_reporting": self.trusted_for_reporting,

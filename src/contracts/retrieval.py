@@ -11,6 +11,7 @@ class RetrievalQuery:
     text: str
     hard: ConstraintPairs = ()
     soft: ConstraintPairs = ()
+    exclude_values: ConstraintPairs = ()
     category: str | None = None
     turn_index: int = 1
     # Asins already returned and scored this session. A turn that did not end
