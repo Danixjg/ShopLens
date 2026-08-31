@@ -568,6 +568,8 @@ and degrade to BM25 when it is absent.
 | O | N with disclosure-order ranking replacing phrase-rarity reranking inside the frozen Top-10 |
 | K | O with disclosures segmented against known catalog values, so a field containing a semicolon stays one constraint |
 | Z | Clarification off, diagnostic only |
+| K | O with the clarification attribute sequence extended by "budget"; experimental, not yet dev-gated |
+| L | O with the clarification policy excluding an attribute already covered by an active disclosed slot; experimental, not yet dev-gated |
 
 U is a documented research ablation, not a retained configuration. Its clean
 dev run at `87834f4` kept HR@10 at `0.941667` and raised MRR from P's

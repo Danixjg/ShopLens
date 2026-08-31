@@ -14,6 +14,10 @@ from .question_value import score_question_values
 
 
 CLARIFICATION_SEQUENCE: tuple[AskAttribute, ...] = ("feature", "material", "color")
+# Reached only once CLARIFICATION_SEQUENCE and "other" are exhausted, so it
+# changes nothing about early-turn attribute choice. Budget is the only
+# addition tested so far; see RunConfig.extended_clarification.
+EXTENDED_CLARIFICATION_SEQUENCE: tuple[AskAttribute, ...] = ("feature", "material", "color", "budget")
 
 
 def _satisfies_hard_constraints(candidate: Candidate) -> bool:
@@ -51,6 +55,9 @@ class ClarificationPolicy:
     def __init__(self, config: RunConfig, catalog: Catalog | None = None) -> None:
         self.config = config
         self.catalog = catalog
+        self._sequence = (
+            EXTENDED_CLARIFICATION_SEQUENCE if config.extended_clarification else CLARIFICATION_SEQUENCE
+        )
 
     @staticmethod
     def _covered(state: SessionState) -> set[str]:
@@ -93,8 +100,13 @@ class ClarificationPolicy:
         return _information_gain(buckets)
 
     def _fixed_choice(self, state: SessionState) -> AskAttribute | None:
-        for attribute in CLARIFICATION_SEQUENCE:
-            if attribute not in state.asked_attributes and attribute not in state.declined_attributes:
+        covered = self._covered(state) if self.config.skip_covered_attributes else set()
+        for attribute in self._sequence:
+            if (
+                attribute not in state.asked_attributes
+                and attribute not in state.declined_attributes
+                and attribute not in covered
+            ):
                 return attribute
         return (
             "other"
@@ -125,10 +137,12 @@ class ClarificationPolicy:
     def _information_choice(
         self, state: SessionState, candidates: list[Candidate], over_general: bool,
     ) -> AskAttribute | None:
+        covered = self._covered(state) if self.config.skip_covered_attributes else set()
         unasked = [
-            attribute for attribute in CLARIFICATION_SEQUENCE
+            attribute for attribute in self._sequence
             if attribute not in state.asked_attributes
             and attribute not in state.declined_attributes
+            and attribute not in covered
         ]
         unasked = self._eligible(unasked, candidates)
         if over_general and unasked:
@@ -157,10 +171,12 @@ class ClarificationPolicy:
         over_general: bool,
         recommendation_limit: int,
     ) -> AskAttribute | None:
+        covered = self._covered(state) if self.config.skip_covered_attributes else set()
         unasked = [
-            attribute for attribute in CLARIFICATION_SEQUENCE
+            attribute for attribute in self._sequence
             if attribute not in state.asked_attributes
             and attribute not in state.declined_attributes
+            and attribute not in covered
         ]
         if self.catalog is not None and unasked:
             values = score_question_values(
@@ -168,7 +184,7 @@ class ClarificationPolicy:
                 self._pool(candidates),
                 active_values={
                     attribute: self._active_values(state, attribute)
-                    for attribute in CLARIFICATION_SEQUENCE
+                    for attribute in self._sequence
                 },
                 recommendation_limit=recommendation_limit,
             )

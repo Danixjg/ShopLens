@@ -83,7 +83,7 @@ def test_environment_can_select_hybrid_config(
 
 
 def test_ablation_matrix_has_exact_names() -> None:
-    assert set(CONFIGS) == set("ABCDEFGHJKNOPQRSTUVWXYZ")
+    assert set(CONFIGS) == set("ABCDEFGHJKLNOPQRSTUVWXYZ")
 
 
 def test_config_z_is_the_only_no_clarification_diagnostic() -> None:
@@ -623,6 +623,61 @@ def test_information_policy_skips_facets_already_covered_by_a_slot() -> None:
         state, parser.parse("I'm looking for Boots. A key requirement is: leather.", 1), "m", 1,
     )
     assert "material" in ClarificationPolicy._covered(state)
+
+
+def test_baseline_choose_ignores_covered_and_still_asks_about_it() -> None:
+    """_covered() returns the right set in isolation, but choose() never
+    consults it by default: a disclosed-but-unasked attribute still gets
+    asked about. This is the gap config L's skip_covered_attributes closes."""
+    parser = TurnParser()
+    state = SessionState(asked_attributes=["feature", "color"])
+    apply_parsed_turn(
+        state, parser.parse("I'm looking for Boots. A key requirement is: leather.", 1), "m", 1,
+    )
+
+    selected = ClarificationPolicy(CONFIGS["O"], None).choose(
+        state, [], over_general=False,
+    )
+
+    assert selected == "material"
+
+
+def test_config_l_skips_a_covered_attribute_in_choose() -> None:
+    """Same scenario as the baseline test above, with skip_covered_attributes
+    enabled: choose() now excludes "material" because an active slot already
+    covers it, the same way an asked or declined attribute is excluded."""
+    parser = TurnParser()
+    state = SessionState(asked_attributes=["feature", "color"])
+    apply_parsed_turn(
+        state, parser.parse("I'm looking for Boots. A key requirement is: leather.", 1), "m", 1,
+    )
+
+    selected = ClarificationPolicy(CONFIGS["L"], None).choose(
+        state, [], over_general=False,
+    )
+
+    assert selected != "material"
+
+
+def test_config_l_does_not_redundantly_ask_about_a_disclosed_attribute(
+    catalog_path: Path,
+) -> None:
+    """Regression test for probe 1 (2026-08-31 session): a single opening
+    message that discloses feature, material, and color all at once must not
+    still draw a clarifying question about one of them. Config O reproduces
+    the bug end to end through the real Agent.respond() path; config L, its
+    skip_covered_attributes twin, does not."""
+    message = "For that, what matters is: leather material; waterproof feature; black color."
+
+    baseline = SubmissionAgent(catalog_path, config=CONFIGS["O"])
+    baseline.reset("s1", {})
+    baseline_response = baseline.respond("s1", message, 1, 10)
+    assert baseline_response["ask_attribute"] in {"feature", "material", "color"}
+
+    fixed = SubmissionAgent(catalog_path, config=CONFIGS["L"])
+    fixed.reset("s2", {})
+    fixed_response = fixed.respond("s2", message, 1, 10)
+    assert fixed_response["ask_attribute"] not in {"feature", "material", "color"}
 
 
 def test_same_attribute_disclosures_accumulate_instead_of_replacing() -> None:
