@@ -234,6 +234,8 @@ handles with the final Devpost roster names before submission if required.
 | MaxLZE | Reproducibility gates, retrieval/ranking ablations, source audits, documentation integrity, and promotion of configuration `O` |
 | suwi | No-repeat configuration `N` and disclosure-order configuration `O` |
 | pranavpillaiNUS | Configuration `O` integration, ProductAgent audit integration, and turn-by-turn error analysis |
+| thaqifrafe | clarification-timing diagnostic tooling, and configurations `K`, `L`, and `AA` (budget-extended, covered-attribute, and embedding-based near-miss clarification; documented rejections) |
+
 
 The original participant kit, evaluator contract, public dataset, and competition
 specification were published by the TechJam2026 organizer repository identity.
