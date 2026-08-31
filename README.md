@@ -386,7 +386,7 @@ Over the 200 public sessions:
 
 | Configuration and search route | Found the target (HR@10) | Rank quality (MRR) | Turns to find it (MTTC) | Score |
 |---|---:|---:|---:|---:|
-| **O+ (submission)**, keyword + meaning-based | 0.9850 | 0.8708 | 2.9250 | **0.9152** |
+| **O+ (submission)**, keyword + meaning-based | 0.9850 | 0.8749 | 2.9300 | **0.9164** |
 | O+ (submission), keyword only | 0.9850 | 0.8857 | 3.1250 | 0.9157 |
 | O (previous submission), keyword + meaning-based | 0.9850 | 0.8211 | 2.7700 | 0.9034 |
 
@@ -397,12 +397,14 @@ better ordering.
 
 The second row is there because the optional embedding packages can be missing.
 When they are, the agent does not fail — it falls back to keyword-only search,
-and on this public set that fallback scores fractionally *higher*: `0.9157`
-against `0.9152`. Both routes find the target in exactly the same 98.5% of
-sessions. Keyword-only ranks it a little better once found (MRR `0.8857` against
-`0.8708`) and takes about a fifth of a turn longer to get there (`3.1250`
-against `2.9250`), and the score's efficiency term charges for those extra
-turns. The two effects nearly cancel, leaving `0.0005` between them.
+and on this public set the two routes land within `0.0007` of each other:
+`0.9164` for the full install against `0.9157` for the fallback. Both routes
+find the target in exactly the same 98.5% of sessions. Keyword-only ranks it a
+little better once found (MRR `0.8857` against `0.8749`) and takes about a fifth
+of a turn longer to get there (`3.1250` against `2.9300`), and the score's
+efficiency term charges for those extra turns. The two effects nearly cancel.
+The full-install row is a reportable `results.jsonl` row; the fallback row is
+still hand-run, so the gap between them is not yet an evidence-gated result.
 
 We report it rather than hide it, for one practical reason: **a grader who
 skips the optional install will see a slightly different number**, and should
@@ -466,7 +468,7 @@ below.
 | T, R+S+Q combined (earlier submission) | 0.941667 | 0.795913 | 3.141667 | 0.866774 | 0.975000 | 0.802932 | 2.837500 | 0.891630 | exploratory |
 | N, Q plus no-repeat | — | — | — | — | — | — | — | — | diagnostic only, no reportable row |
 | O, N plus disclosure-order rank (previous submission) | 0.983333 | 0.844722 | 2.833333 | 0.908416 | 0.987500 | 0.795982 | 2.687500 | 0.898795 | exploratory |
-| **O+, O with refitted weights (submission)** | **0.9833** | **0.8887** | **2.9667** | **0.9189** | **0.9875** | **0.8439** | **2.8625** | **0.9097** | **fit saw holdout sessions** |
+| **O+, O with refitted weights (submission)** | **0.9833** | **0.8887** | **2.9667** | **0.9189** | **0.9875** | **0.8543** | **2.8750** | **0.9125** | **fit saw holdout sessions** |
 | U, expected question value | 0.941667 | 0.641323 | 3.175000 | 0.819730 | — | — | — | — | rejected on dev gate |
 | V, facet population gate | 0.941667 | 0.639239 | 3.133333 | 0.819939 | — | — | — | — | tied P, not retained |
 
@@ -683,10 +685,10 @@ stratified split, it gains on both halves — this is the run you can reproduce:
 | Split | n | HR@10 | MRR | MTTC | Efficiency | Score |
 |---|---:|---:|---:|---:|---:|---:|
 | dev | 120 | 0.9833 | 0.8887 | 2.9667 | 0.8033 | **0.9189** |
-| holdout | 80 | 0.9875 | 0.8439 | 2.8625 | 0.8137 | **0.9097** |
-| all 200 | 200 | 0.9850 | 0.8708 | 2.9250 | 0.8075 | **0.9152** |
+| holdout | 80 | 0.9875 | 0.8543 | 2.8750 | 0.8125 | **0.9125** |
+| all 200 | 200 | 0.9850 | 0.8749 | 2.9300 | 0.8070 | **0.9164** |
 
-Against O that is dev `0.9084 → 0.9189` and holdout `0.8959 → 0.9097`, all of
+Against O that is dev `0.9084 → 0.9189` and holdout `0.8959 → 0.9125`, all of
 it from ranking quality: the same products are found, in a better order, at a
 small cost in turns.
 
@@ -694,22 +696,21 @@ Which split you use moves the halves, not the total:
 
 | Split used | dev | holdout | all 200 |
 |---|---:|---:|---:|
-| Fold 0, the random seed-0 split the weights were fitted on | 0.9100 | 0.9231 | 0.9152 |
-| Official stratified split | 0.9189 | 0.9097 | 0.9152 |
+| Fold 0, the random seed-0 split the weights were fitted on | 0.9100 | 0.9231 | 0.9164 |
+| Official stratified split | 0.9189 | 0.9125 | 0.9164 |
 
-Both splittings agree exactly on all 200 sessions at `0.9152`, and the dev
+Both splittings agree exactly on all 200 sessions at `0.9164`, and the dev
 versus holdout gap flips sign between them.
 
 **Two caveats belong with those numbers.** The fit drew its training half from a
 random split of all 200 public sessions, so it saw a large share of the official
 80-session holdout; O+'s holdout figure is therefore not an untouched result in
 the way P, R and S's are, and it is a weaker claim than the "exploratory" label
-carried by Q, T and O. And these figures are quoted to four decimal places
-because they were produced by hand from the committed weights: `results.jsonl`
-holds no reportable O+ row yet, so nothing here has passed the clean-tree
-evidence gate the other rows did. A clean fit on the official development split,
-and a reportable run of both splits, are the outstanding work on the submission
-configuration.
+carried by Q, T and O. The figures above now come from reportable
+`results.jsonl` rows for O+ at commit `f3731ea` — dev, holdout and all 200 —
+each written by `src.eval.runner` on a clean tree, so they have passed the same
+evidence gate the other rows did. A clean fit on the official development split
+is the outstanding work on the submission configuration.
 
 A change is retained only if it gains on **both** splits without a severe
 scenario regression.
@@ -799,11 +800,12 @@ off it.
 constants — and it is what a bare `Agent()` builds with no environment variables
 set. The agent runs end to end, offline, over all 200 public sessions.
 
-One piece of paperwork is outstanding: O+ has no reportable row in
-`results.jsonl` yet, so its figures on this page are hand-run rather than
-written by `src.eval.runner` on a clean tree. Every other number here comes from
-that evidence log. The [experiment log](#the-experiment-log) states the caveats
-that go with promoting it.
+O+ now has reportable rows in `results.jsonl` — dev, holdout and all 200 at
+commit `f3731ea` — so its figures on this page are written by `src.eval.runner`
+on a clean tree, like every other number here. One piece of work remains: the
+weights were fitted on a random split rather than the official development
+split. The [experiment log](#the-experiment-log) states the caveats that go with
+promoting it.
 
 The remaining letters are research, not unfinished submission work. `G` and `H`
 name optional components the plan never specifies, and `L`, `AA`, `W`, `X`, `Y`
