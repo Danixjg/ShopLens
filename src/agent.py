@@ -37,7 +37,7 @@ def rerank_window_size(recommendation_limit: int, window: int) -> int:
 
 
 class Agent:
-    """Offline, stateful ShopLens implementation of the organizer contract."""
+    """Offline, stateful TrippyShoppy implementation of the organizer contract."""
 
     def __init__(
         self,
@@ -45,7 +45,7 @@ class Agent:
         config: RunConfig | str | None = None,
     ) -> None:
         self.config = config if isinstance(config, RunConfig) else get_run_config(config)
-        explicit_checksum = os.getenv("SHOPLENS_CATALOG_SHA256") or None
+        explicit_checksum = os.getenv("TRIPPYSHOPPY_CATALOG_SHA256") or None
         requested_catalog = Path(catalog_path)
         uses_default_path = requested_catalog == Path("data/catalog.jsonl")
         catalog = OFFICIAL_CATALOG_PATH if uses_default_path else requested_catalog

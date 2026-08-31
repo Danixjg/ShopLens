@@ -1,4 +1,4 @@
-"""Frozen data contracts shared by ShopLens modules."""
+"""Frozen data contracts shared by TrippyShoppy modules."""
 
 from .config import CONFIGS, RunConfig, get_run_config
 from .parsing import ParsedTurn

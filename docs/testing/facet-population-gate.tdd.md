@@ -5,7 +5,7 @@
 This cycle implements the single behavioral item marked Adopt in the
 [ProductAgent source audit](../productagent-integration.md): filter
 clarification aspects by field population. The idea is credited to Ye et al.,
-arXiv:2407.00942, and is implemented independently against ShopLens's own
+arXiv:2407.00942, and is implemented independently against TrippyShoppy's own
 catalog and contract. No upstream code or data was consulted.
 
 Scope is implementation and unit tests only. No evaluation run was performed,
@@ -14,7 +14,7 @@ the decision rule cannot be chosen after seeing a result.
 
 ## User journeys
 
-1. As a shopper, I want ShopLens to spend its clarification turn on a question
+1. As a shopper, I want TrippyShoppy to spend its clarification turn on a question
    the catalog can actually answer, so that a turn is not wasted on a facet no
    candidate carries.
 2. As a maintainer, I want the change isolated behind config `V`, so that `P`

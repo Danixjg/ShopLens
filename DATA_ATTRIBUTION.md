@@ -24,7 +24,7 @@ E-commerce Dialogue Generation with Decision Tree Branching* (ACL 2025).
 - Source audit and adoption boundary:
   [docs/wizard-of-shopping-integration.md](docs/wizard-of-shopping-integration.md)
 
-ShopLens currently includes no upstream TRACER code and no Wizard of Shopping
+TrippyShoppy currently includes no upstream TRACER code and no Wizard of Shopping
 dataset records. The source audit explains why those separately published
 artifacts remain excluded pending compatible, explicit reuse terms.
 
@@ -41,6 +41,6 @@ Clarification Questions* (arXiv:2407.00942, 2024).
 - Source audit and adoption boundary:
   [docs/productagent-integration.md](docs/productagent-integration.md)
 
-ShopLens includes no ProductAgent code and no AliMe KG records. That corpus is
+TrippyShoppy includes no ProductAgent code and no AliMe KG records. That corpus is
 outside the Amazon Reviews 2023 competition package and is not part of the
 data pipeline.
