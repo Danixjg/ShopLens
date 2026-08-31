@@ -1,9 +1,9 @@
-# ShopLens — Devpost draft
+# TrippyShoppy — Devpost draft
 
 ## Project description
 
-ShopLens is a deterministic, offline-first conversational shopping agent for
-the TechJam 2026 conversational-search challenge. The evaluator now defaults to
+TrippyShoppy is a deterministic, offline-first conversational shopping agent for
+the TechJam 2026 conversational-search challenge. The evaluator defaults to
 configuration `O+`; its parent, configuration `O`, is the latest build with
 reportable evidence and recorded a TechnicalScore of `0.908416` on our
 120-session development split and `0.898795` on the 80-session exploratory
@@ -11,7 +11,7 @@ holdout. It runs on CPU, uses no hosted model or paid API, and reports zero
 prompt and completion tokens.
 
 The organizer calls `Agent.reset(session_id, user_profile)` once and
-`Agent.respond(session_id, user_message, turn, top_k)` on each turn. ShopLens
+`Agent.respond(session_id, user_message, turn, top_k)` on each turn. TrippyShoppy
 returns up to ten ranked catalog products and a structured clarification in the
 same response. It remembers disclosed preferences, handles genuine intent
 overrides, avoids repeating products already scored in the session, and always
@@ -62,12 +62,12 @@ specific reason to change it.
    deterministic catalog fallback and still return the required response shape.
 
 The no-repeat rule has a safety valve: if withholding previously shown products
-would empty the candidate pool, ShopLens keeps the unfiltered pool instead of
+would empty the candidate pool, TrippyShoppy keeps the unfiltered pool instead of
 returning nothing.
 
 ## Submission configuration
 
-An unset `SHOPLENS_CONFIG` selects `O+`; an unknown value falls back to the
+An unset `TRIPPYSHOPPY_CONFIG` selects `O+`; an unknown value falls back to the
 standard-library baseline `A`. The accuracy-critical `O+` path enables hybrid
 retrieval, session memory, bounded constraint scoring, dynamic intent weights,
 information-gain clarification, no-repeat recommendations, disclosure-order
@@ -195,7 +195,7 @@ evaluation commands, hashes, and evidence rules are documented in the
   directional rather than stable.
 - The reportable dense path has a large CPU cold start and roughly 2 GB peak
   memory, although cached normal use is much faster.
-- ShopLens has no image input, external vector database, full-model training,
+- TrippyShoppy has no image input, external vector database, full-model training,
   hosted LLM dependency, or real transaction support.
 
 ## Research credit
@@ -214,7 +214,7 @@ gate. We rejected `U` without opening holdout.
 DOI: [10.18653/v1/P18-1255](https://doi.org/10.18653/v1/P18-1255). Canonical
 publication: [ACL Anthology](https://aclanthology.org/P18-1255/). The paper is
 licensed under Creative Commons Attribution 4.0 International (CC BY 4.0).
-ShopLens did not reproduce or port its neural model, code, training data,
+TrippyShoppy did not reproduce or port its neural model, code, training data,
 annotations, or weights. The complete adoption boundary is in
 [research-attribution.md](research-attribution.md).
 

@@ -1,6 +1,6 @@
 # Wizard of Shopping source audit and adoption boundary
 
-This record governs how ShopLens may use ideas from *Wizard of Shopping* and
+This record governs how TrippyShoppy may use ideas from *Wizard of Shopping* and
 its TRACER methodology. It separates attribution for the paper from permission
 to copy the separately published code or dataset. No upstream TRACER code or
 Wizard of Shopping (WoS) dataset bytes are included in this repository.
@@ -23,7 +23,7 @@ Computational Linguistics.
 The local Codex-oriented conversion (`docs/Wizard_of_Shopping.md`, which is
 Git-ignored and never redistributed, so it is absent from a fresh clone) was
 made from
-arXiv:2502.00969v1 before the final ACL record was available. ShopLens cites
+arXiv:2502.00969v1 before the final ACL record was available. TrippyShoppy cites
 the final ACL publication as canonical and identifies the local restructuring
 and technical index as changes to the source presentation. CC BY 4.0 requires
 appropriate credit, a license link, and an indication of changes.
@@ -39,22 +39,22 @@ They are conservative engineering controls, not legal advice.
 | arXiv v1 and local conversion | Adapt with credit | The arXiv record links CC BY 4.0. The local Markdown changes the presentation and must retain source/version metadata. |
 | Upstream code | Do not import | The public repository says the code is provided for “research purposes” but exposes no standard license file in its root. That notice is not treated as permission to copy, modify, or redistribute code. Independent implementation from the published method remains allowed subject to review. |
 | WoS dataset | Do not import | The repository offers the zip for benchmarking but gives no distinct dataset license; it directs users to TREC Product Search data terms. Do not download, commit, train on, or redistribute it until those terms and all upstream data licenses are documented as compatible. |
-| TREC Product Search inputs | Do not import | They are not part of ShopLens's Amazon Reviews 2023 competition package. Any future use requires a separate provenance and license review. |
+| TREC Product Search inputs | Do not import | They are not part of TrippyShoppy's Amazon Reviews 2023 competition package. Any future use requires a separate provenance and license review. |
 
 If the upstream repository later adds explicit licenses, update this audit from
 the primary records before changing a decision. Public availability alone is
 not sufficient permission to copy an artifact.
 
-## ShopLens adoption matrix
+## TrippyShoppy adoption matrix
 
-| Decision | TRACER/WoS concept | ShopLens treatment |
+| Decision | TRACER/WoS concept | TrippyShoppy treatment |
 |---|---|---|
 | Adopt | Wanted, unwanted, and optional preference semantics | Extend the existing slot and declined-attribute model only where tests show missing behavior. Implement independently and cite TRACER as the methodological influence. |
 | Tested, not retained | Catalog-aware aspect selection | Built as ablation config `V` and measured once on the frozen dev split. It tied `P` exactly, so the existing candidate-pool information-gain policy stands unchanged. See [Measured outcomes](#measured-outcomes). |
-| Evaluate | Attributed synthetic dialogue fixtures | Generate fixtures only from the immutable ShopLens catalog and deterministic local rules. Mark them as ShopLens-generated and TRACER-inspired; do not derive them from WoS dialogue text. |
+| Evaluate | Attributed synthetic dialogue fixtures | Generate fixtures only from the immutable TrippyShoppy catalog and deterministic local rules. Mark them as TrippyShoppy-generated and TRACER-inspired; do not derive them from WoS dialogue text. |
 | Evaluate, half answered | Frequent-value clarification hints and facet hygiene | Noisy-facet suppression was built as `V`, produced no ranking evidence, and is not retained. Concise clarification hints were never built and remain genuinely open, still subject to the same dev-split rule. |
 | Defer | Upstream TRACER implementation and WoS dataset | Keep both outside the repository until explicit compatible terms are verified. Do not translate or mechanically reproduce upstream source code. |
-| Defer | LLM verbalization and CQG/CPR fine-tuning | ShopLens must remain useful offline and deterministic. These experiments require a separate approved plan, dependencies, model provenance, and resource budget. |
+| Defer | LLM verbalization and CQG/CPR fine-tuning | TrippyShoppy must remain useful offline and deterministic. These experiments require a separate approved plan, dependencies, model provenance, and resource budget. |
 
 ## Measured outcomes
 
@@ -86,7 +86,7 @@ all three). The condition the unit tests construct synthetically does not arise
 in real retrieved pools, so the gate never fires.
 
 The honest reading is that this record's caution was vindicated. The paper's
-methods are sound, but on ShopLens's catalog and contract the existing
+methods are sound, but on TrippyShoppy's catalog and contract the existing
 information-gain policy already captures the available benefit, and two
 independent attempts to improve on it measured no gain. A rejected config with a
 reportable row is a stronger result than an adopted idea with no measurement.
@@ -118,7 +118,7 @@ central intuition of asking about a facet that divides the remaining candidate
 space. This record previously required that the behavioral gap between that
 policy and the paper's repeatedly fitted decision-tree planner be tested before
 any adoption, on the principle that sharing an intuition is not evidence that a
-second implementation improves ShopLens. **That prerequisite has been
+second implementation improves TrippyShoppy. **That prerequisite has been
 discharged.** Both experiments were run and both came back negative; the
 results are recorded in [Measured outcomes](#measured-outcomes) below.
 
@@ -127,6 +127,6 @@ results are recorded in [Measured outcomes](#measured-outcomes) below.
 Any future module that materially adapts TRACER's published method must name
 the paper and DOI in its module documentation. Generated fixture files must
 record the generator version, catalog checksum, random seed, the canonical
-paper URL, and a statement that the records are ShopLens-generated rather than
+paper URL, and a statement that the records are TrippyShoppy-generated rather than
 copied from WoS. README, data-provenance, release, and demo materials must link
 back to this audit so the distinction remains visible.

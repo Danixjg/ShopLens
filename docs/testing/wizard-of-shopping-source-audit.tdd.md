@@ -19,7 +19,7 @@ belong to later TDD cycles.
    that the paper is credited and separately published artifacts are not copied
    without permission.
 2. As a maintainer, I want adopt/evaluate/defer decisions and architecture
-   guards so that later experiments preserve ShopLens's competition contract.
+   guards so that later experiments preserve TrippyShoppy's competition contract.
 3. As a reviewer, I want attribution linked from the repository's main entry
    points so that provenance remains visible during releases and reviews.
 
@@ -42,7 +42,7 @@ gap remained and was fixed before GREEN. No acceptance criterion was weakened.
 | 1 | The integration record includes every author, the ACL URL, DOI, and CC BY 4.0 notice. | `test_integration_record_cites_the_primary_paper` | Documentation contract | PASS | `python3 -m pytest -q tests/test_wizard_integration_docs.py` |
 | 2 | Ambiguously licensed upstream code and WoS data are classified as do not import. | `test_source_audit_blocks_copying_artifacts_without_clear_terms` | Documentation contract | PASS | Targeted pytest run: 5 passed |
 | 3 | The adoption matrix contains adopt, evaluate, and defer decisions for the paper's relevant concepts. | `test_adoption_matrix_has_adopt_evaluate_and_defer_decisions` | Architecture contract | PASS | Targeted pytest run: 5 passed |
-| 4 | Offline determinism, the Agent contract, immutable catalog, read-only evaluator, and dev-only tuning are explicit guards. | `test_adoption_boundary_preserves_shoplens_contracts` | Architecture contract | PASS | Targeted pytest run: 5 passed |
+| 4 | Offline determinism, the Agent contract, immutable catalog, read-only evaluator, and dev-only tuning are explicit guards. | `test_adoption_boundary_preserves_trippyshoppy_contracts` | Architecture contract | PASS | Targeted pytest run: 5 passed |
 | 5 | README, data attribution, and data provenance link to the integration record. | `test_repository_entry_points_link_the_integration_record` | Integration | PASS | Targeted pytest run: 5 passed |
 
 ## Validation and coverage

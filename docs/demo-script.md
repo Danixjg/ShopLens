@@ -1,4 +1,4 @@
-# ShopLens demo video script
+# TrippyShoppy demo video script
 
 Target length: 3–4 minutes. Do not show credentials, private data, or unlicensed
 third-party media.

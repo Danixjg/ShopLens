@@ -2,7 +2,7 @@
 
 ## Clarification-question value
 
-ShopLens's expected-question-value experiment is inspired by:
+TrippyShoppy's expected-question-value experiment is inspired by:
 
 > Sudha Rao and Hal Daumé III. 2018. *Learning to Ask Good Questions: Ranking Clarification Questions using Neural Expected Value of Perfect Information.*
 > Proceedings of the 56th Annual Meeting of the Association for Computational
@@ -13,7 +13,7 @@ ShopLens's expected-question-value experiment is inspired by:
 - DOI: https://doi.org/10.18653/v1/P18-1255
 - Paper license: Creative Commons Attribution 4.0 International (CC BY 4.0)
 
-The ShopLens implementation is an independent, deterministic adaptation of
+The TrippyShoppy implementation is an independent, deterministic adaptation of
 the paper's expected-value framing to the competition's fixed
 `ask_attribute` contract. It does not reproduce the paper's neural model and
 does not copy its source code, training data, annotations, or model weights.
@@ -22,7 +22,7 @@ and is not part of the public release bundle.
 
 ## Conversational product-search benchmarking
 
-ShopLens's clarification-quality guards and its evaluation reporting
+TrippyShoppy's clarification-quality guards and its evaluation reporting
 discipline are informed by:
 
 > Jingheng Ye, Yong Jiang, Xiaobin Wang, Yinghui Li, Yangning Li, Hai-Tao
@@ -37,7 +37,7 @@ discipline are informed by:
 That license is an agreement between the authors and arXiv. Unlike the CC BY
 4.0 source above, it grants no third-party right to redistribute the paper or
 publish a derivative conversion of it, so no copy or conversion is tracked
-here. ShopLens contains no ProductAgent code and no AliMe KG records, and runs
+here. TrippyShoppy contains no ProductAgent code and no AliMe KG records, and runs
 no language model, SQL statistics tool, or user simulator. What is taken from
 the paper is a set of documented failure modes and reporting rules,
 implemented independently. See

@@ -1,4 +1,4 @@
-"""Print a deterministic multi-turn ShopLens walkthrough."""
+"""Print a deterministic multi-turn TrippyShoppy walkthrough."""
 
 from __future__ import annotations
 
@@ -82,7 +82,7 @@ def render_turn(agent: Agent, turn: int, message: str, response: dict) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run a ShopLens multi-turn demo")
+    parser = argparse.ArgumentParser(description="Run a TrippyShoppy multi-turn demo")
     parser.add_argument("--catalog", default="data/catalog.jsonl")
     parser.add_argument("--config", default="P")
     args = parser.parse_args()
@@ -95,7 +95,7 @@ def main() -> None:
         f"catalog {len(agent.catalog)} products"
     )
 
-    session_id = "shoplens-demo"
+    session_id = "trippyshoppy-demo"
     agent.reset(session_id, DEMO_PROFILE)
     for turn, message in enumerate(DEMO_MESSAGES, start=1):
         response = agent.respond(session_id, message, turn, 10)

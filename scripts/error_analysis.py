@@ -1,4 +1,4 @@
-"""Turn-by-turn error analysis for ShopLens.
+"""Turn-by-turn error analysis for TrippyShoppy.
 
 The organizer's evaluator only reports hit/miss + rank per session, not *why*
 a session failed. This script re-plays the exact same conversation logic
@@ -206,7 +206,7 @@ def trace_session(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Trace failing/low-ranked ShopLens sessions turn-by-turn")
+    parser = argparse.ArgumentParser(description="Trace failing/low-ranked TrippyShoppy sessions turn-by-turn")
     parser.add_argument("--catalog", default="data/catalog.jsonl")
     parser.add_argument("--dataset", default="data/public_set.jsonl")
     parser.add_argument("--config", default="P")

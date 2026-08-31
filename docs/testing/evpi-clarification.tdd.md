@@ -10,7 +10,7 @@ boundary are recorded in [research-attribution.md](../research-attribution.md).
 
 ## User journeys
 
-1. As a shopper, I want ShopLens to ask the eligible attribute whose possible
+1. As a shopper, I want TrippyShoppy to ask the eligible attribute whose possible
    answer is expected to improve the Top-K decision most, so that each
    clarification is useful rather than merely relevant.
 2. As a maintainer, I want the new policy isolated behind config `U`, so that
@@ -18,7 +18,7 @@ boundary are recorded in [research-attribution.md](../research-attribution.md).
    reproducible control.
 3. As a reviewer, I want the research inspiration and reuse boundary visible
    from the README, so that the original authors receive durable credit and no
-   local transcript or upstream implementation is mistaken for ShopLens code.
+   local transcript or upstream implementation is mistaken for TrippyShoppy code.
 
 ## Task report
 

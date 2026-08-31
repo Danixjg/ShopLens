@@ -442,6 +442,6 @@ def get_run_config(name: str | None = None) -> RunConfig:
     Selecting a hybrid config is safe without the dense extras: the retriever
     factory degrades to the deterministic BM25 route rather than failing.
     """
-    fallback = os.getenv("SHOPLENS_CONFIG", SUBMISSION_CONFIG_NAME)
+    fallback = os.getenv("TRIPPYSHOPPY_CONFIG", SUBMISSION_CONFIG_NAME)
     selected = (name if name is not None else fallback).strip().upper()
     return CONFIGS.get(selected, CONFIGS[FALLBACK_CONFIG_NAME])

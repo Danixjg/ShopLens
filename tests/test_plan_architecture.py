@@ -73,7 +73,7 @@ def test_unknown_config_falls_back_to_a() -> None:
 
 
 def test_unset_config_defaults_to_o_plus(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("SHOPLENS_CONFIG", raising=False)
+    monkeypatch.delenv("TRIPPYSHOPPY_CONFIG", raising=False)
     assert get_run_config() is CONFIGS["O+"]
 
 
@@ -85,12 +85,12 @@ def test_agent_defaults_to_the_evaluator_configuration(catalog_path: Path) -> No
 def test_environment_can_select_hybrid_config(
     catalog_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("SHOPLENS_CONFIG", "C")
+    monkeypatch.setenv("TRIPPYSHOPPY_CONFIG", "C")
     assert SubmissionAgent(catalog_path).config is CONFIGS["C"]
 
 
 def test_ablation_matrix_has_exact_names() -> None:
-    assert set(CONFIGS) == set("ABCDEFGHJNOPQRSTUVWXYZ") | {"K", "L", "M", "AA", "O+"}
+    assert set(CONFIGS) == set("ABCDEFGHJKLMNOPQRSTUVWXYZ") | {"O+", "AA"}
 
 
 def test_config_z_is_the_only_no_clarification_diagnostic() -> None:
@@ -127,7 +127,7 @@ def test_explicit_checksum_override_is_a_hard_gate(
 ) -> None:
     path = tmp_path / "custom-catalog.jsonl"
     path.write_text(json.dumps(ROWS[0]) + "\n", encoding="utf-8")
-    monkeypatch.setenv("SHOPLENS_CATALOG_SHA256", "0" * 64)
+    monkeypatch.setenv("TRIPPYSHOPPY_CATALOG_SHA256", "0" * 64)
     with pytest.raises(ValueError, match="checksum mismatch"):
         SubmissionAgent(path)
 
