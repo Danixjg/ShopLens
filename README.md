@@ -84,6 +84,11 @@ On the 200 public practice sessions it finds the shopper's target in 98.5% of
 them, in under three turns on average. It costs $0 to run: no paid API, no
 network access after setup, and zero tokens either way.
 
+> **Evaluating this project?** Follow [Getting started](#getting-started), then
+> run `python3 -m evaluator.local_evaluator`. That is the organizers' own
+> evaluator against the submission configuration, and the score it prints is the
+> first row of [Results](#results). Everything else on this page is background.
+
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ### A real session
@@ -379,25 +384,41 @@ evidence, which is why that file is untracked here.
 
 Over the 200 public sessions:
 
-| Configuration and route | Found target (HR@10) | Rank quality (MRR) | Turns to find it (MTTC) | Score |
+| Configuration and search route | Found the target (HR@10) | Rank quality (MRR) | Turns to find it (MTTC) | Score |
 |---|---:|---:|---:|---:|
 | **O+ (submission)**, keyword + meaning-based | 0.9850 | 0.8708 | 2.9250 | **0.9152** |
-| O (previous submission), keyword + meaning-based | 0.985 | 0.825226 | 2.775 | 0.904568 |
-| O (previous submission), keyword only fallback | 0.985 | 0.880478 | 3.000 | 0.916643 |
+| O+ (submission), keyword only | 0.9850 | 0.8857 | 3.1250 | 0.9157 |
+| O (previous submission), keyword + meaning-based | 0.9850 | 0.8211 | 2.7700 | 0.9034 |
 
-O+ is O with eight scoring constants refitted; it changes ranking order, not
-which products are retrieved, which is why hit rate is identical and the gain is
-in MRR.
+**How to read this.** The first row is what a full install scores, and it is the
+number the submission claims. The third row is the previous submission, included
+so the gain from refitting the scoring weights is visible: same products found,
+better ordering.
 
-**Read the last row carefully: the keyword-only fallback is not a downgrade on
-this set — it scores higher than the route it falls back from.** Both routes
-find the target in the same 98.5% of sessions; the keyword-only route ranks it a
-little better once found, and takes a little longer to get there. Do not read
-that as an improvement, and do not compare it against the split tables below,
-which are meaning-based only and computed on 120/80 splits rather than all 200
-sessions. The fallback route has not been measured for O+. To tell which route
-produced a number, check `effective_retriever` in a `src.eval.runner` row, or
-simply whether `numpy` and `sentence-transformers` are importable.
+The second row is there because the optional embedding packages can be missing.
+When they are, the agent does not fail — it falls back to keyword-only search,
+and on this public set that fallback scores fractionally *higher*: `0.9157`
+against `0.9152`. Both routes find the target in exactly the same 98.5% of
+sessions. Keyword-only ranks it a little better once found (MRR `0.8857` against
+`0.8708`) and takes about a fifth of a turn longer to get there (`3.1250`
+against `2.9250`), and the score's efficiency term charges for those extra
+turns. The two effects nearly cancel, leaving `0.0005` between them.
+
+We report it rather than hide it, for one practical reason: **a grader who
+skips the optional install will see a slightly different number**, and should
+know that is expected rather than a broken run. It is not evidence that
+keyword-only search is better — on the development and holdout splits, where the
+comparison was made properly, the meaning-based route is what every retained
+configuration was measured on. To tell which route produced a number, check
+`effective_retriever` in a `src.eval.runner` row, or simply whether `numpy` and
+`sentence-transformers` are importable.
+
+One caution on comparing tables: these three rows cover all 200 public sessions,
+while the split tables further down are computed on the 120/80 development and
+holdout halves. Scores from the two are not interchangeable. All three come from
+`python3 -m evaluator.local_evaluator` over the full public set — the second row
+from an interpreter without the optional packages — so none of them appears in
+`results.jsonl`, which logs split runs only.
 
 For reference, the organizers' starter agent — which never asks a question —
 scores HR@10 `0.125`, MRR `0.068034`, MTTC `9.81` and `0.10671` overall, as
@@ -493,16 +514,19 @@ sessions and regressed none, with identical hit rate and turn count; the
 bootstrap put that gain at `0.019567`, interval `[0.010258, 0.029980]`. Peak
 memory rose by `580` KB.
 
-### Why O was kept
+### Why O was kept over T, and why O+ inherits that reasoning
 
 ```text
 Q
 ├── N = Q + skip already-shown products
-│   └── O = N + disclosure-order ranking   <- SUBMISSION
+│   └── O = N + disclosure-order ranking        <- previous submission
+│       └── O+ = O with refitted weights        <- SUBMISSION
 │
-└── T = Q + symmetric routing + profile ranking
-                                           <- PREVIOUS SUBMISSION
+└── T = Q + symmetric routing + profile ranking <- the submission before O
 ```
+
+O+ changes eight numbers inside O and no structure, so everything below about
+why O was kept applies to it unchanged.
 
 N and O are one-flag steps along a single branch. T is a *sibling* of N, not an
 ancestor, so the five flags between T and O are the distance between two
@@ -634,12 +658,12 @@ absent.
 | J | Y with the widened window restricted to per-session evidence, so the popularity and profile nudges may reorder a frozen top ten but not decide its membership |
 | N | Q plus no-repeat: a product already offered and scored is withheld later, and an override clears that memory |
 | O | N with disclosure-order ranking replacing phrase-rarity reranking inside the frozen top ten (previous submission) |
+| O+ | O with its eight scoring magnitudes fitted rather than guessed — **the submission**; O itself is unchanged |
 | Z | Clarification off, diagnostic only |
 | M | O with disclosures resolved against known catalog values, so a feature bullet containing a semicolon stays one preference; measured on dev under its former letter K, tied O, gate not cleared |
 | K | O with the clarification question sequence extended by "budget", reached once feature, material and colour are exhausted; experimental, not yet gated |
 | L | O with clarification skipping an attribute the shopper has already covered; experimental, not yet gated |
 | AA | O with clarification chosen by embedding similarity to the near-miss pool (ranks 11–50) instead of discrete question splitting; experimental, not yet gated. Named "AA" as the next spreadsheet-style column after Z — an open question for the team, not a unilateral decision |
-| O+ | O with its eight scoring magnitudes fitted rather than guessed — **the submission**; O itself is unchanged |
 
 **About O+, the submission.** It leaves every structural choice in O intact and only replaces
 eight previously-guessed numbers — the fused-score multiplier, the precision
@@ -648,9 +672,9 @@ and the soft-preference decay and floor. They were learned by black-box search
 (random search, then Nelder-Mead) maximising the score, then frozen;
 `scripts/learn_config_o.py` reproduces the fit, and the frozen values and the
 exact training sample ids are documented above `CONFIGS["O+"]`. Because every
-default reproduces O's shipped magnitudes, the graded submission is unchanged
-byte for byte, and a test asserts O's numbers are identical after the weights
-were exposed.
+default reproduces O's shipped magnitudes, exposing the weights left O itself
+unchanged byte for byte, and a test asserts O's scores are identical before and
+after.
 
 The weights were fitted on a *random* 120/80 split, not the official stratified
 one. Re-run with the same committed weights on the official deterministic
@@ -662,9 +686,9 @@ stratified split, it gains on both halves — this is the run you can reproduce:
 | holdout | 80 | 0.9875 | 0.8439 | 2.8625 | 0.8137 | **0.9097** |
 | all 200 | 200 | 0.9850 | 0.8708 | 2.9250 | 0.8075 | **0.9152** |
 
-Against O that is dev `0.9084 → 0.9189` and a never-trained holdout
-`0.8959 → 0.9097`, all of it from ranking quality, with hit rate unchanged and a
-small efficiency cost.
+Against O that is dev `0.9084 → 0.9189` and holdout `0.8959 → 0.9097`, all of
+it from ranking quality: the same products are found, in a better order, at a
+small cost in turns.
 
 Which split you use moves the halves, not the total:
 
@@ -761,6 +785,9 @@ off it.
   product property from sparse free-form metadata.
 - The embedding model is vendored. The cross-encoder is not specified by the
   plan, and G preserves the incoming order if it is missing.
+- The submission's eight scoring constants were fitted on a random split of the
+  public sessions, so its holdout figure is not an untouched result. The 800
+  private grading sessions are unaffected, since nothing here has seen them.
 - No image input, no external vector database, no cross-session profiling, no
   catalog mutation, no model training.
 
@@ -813,9 +840,10 @@ Repository history is the source of truth. The identities in it so far:
 | Kivye | Deterministic clarification sequence, starter-agent tests, stateful keyword retrieval |
 | MaxLZE | ProductAgent research integration, attribution, TDD workflow |
 | thaqifrafe | Clarification-timing diagnostics, configurations K and L |
+| suwi1226 | The submission's ranking core: no-repeat recommendation memory (N), disclosure-order reranking (O) and the fitted scoring weights (O+) |
+| PranavPillaiNUS | Catalog-grounded disclosure segmentation and its property test (M), turn-by-turn error analysis tooling, evidence-record reconciliation, and this README |
 
-Remaining team identities should be added with their exact contributions before
-the submission freeze; no names are inferred where the repository contains none.
+Every name above is taken from commit authorship; none is inferred.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
