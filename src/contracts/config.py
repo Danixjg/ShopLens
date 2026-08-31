@@ -6,7 +6,9 @@ from typing import Literal
 
 
 RetrievalMode = Literal["bm25", "dense", "hybrid"]
-ClarificationMode = Literal["off", "empty_result_only", "info_gain", "expected_value"]
+ClarificationMode = Literal[
+    "off", "empty_result_only", "info_gain", "expected_value", "embedding_promotion",
+]
 RerankerMode = Literal["none", "local_cross_encoder"]
 # What the dense encoder indexes. "full" is the historical flat concatenation;
 # "compact" keeps only the fields the BM25 index already weights highest.
@@ -343,6 +345,32 @@ CONFIGS: dict[str, RunConfig] = {
         exclude_shown=True,
         ordered_rerank=True,
         skip_covered_attributes=True,
+    ),
+    # O with the clarification policy's targeted-attribute choice replaced by
+    # an embedding comparison against the near-miss pool (ranks recommendation_
+    # limit..50 of the pre-truncation candidates), instead of the discrete
+    # facet-based information gain _gain() uses. A separate mode, not a flag on
+    # info_gain, so it shares no code with _gain(): see
+    # ClarificationPolicy._embedding_choice. Experimental, not yet dev-gated.
+    #
+    # Named "AA" rather than the last free single letter ("I"): every other
+    # uppercase letter is already spoken for, so this is proposed as the next
+    # value under a spreadsheet-column-style naming scheme (A..Z, then AA, AB,
+    # ...) rather than quietly spending the last single letter. Open question
+    # for the team, not decided here -- see the PR description.
+    "AA": replace(
+        _A,
+        name="AA",
+        retrieval_mode="hybrid",
+        constraint_scoring=True,
+        session_memory=True,
+        clarification="embedding_promotion",
+        dynamic_weights=True,
+        phrase_rerank=True,
+        popularity_rerank=True,
+        popularity_rerank_weight=POPULARITY_RERANK_WEIGHT,
+        exclude_shown=True,
+        ordered_rerank=True,
     ),
 }
 

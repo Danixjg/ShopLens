@@ -177,6 +177,7 @@ class DenseRetriever:
         self.model_path = path
         self.official_model_verified = official_model
         self._asins = [product.parent_asin for product in catalog]
+        self._asin_index = {asin: index for index, asin in enumerate(self._asins)}
         if cache_path is None:
             cache = catalog.path.with_suffix(".embeddings.npz")
         else:
@@ -323,6 +324,30 @@ class DenseRetriever:
         digest.update(shape)
         digest.update(memoryview(array).cast("B"))
         return digest.hexdigest()
+
+    def embedding_for(self, asin: str):
+        """The catalog's already-computed vector for one asin, or None.
+
+        Reuses the in-memory matrix built once for the whole catalog; callers
+        needing a candidate's vector should never re-encode its text.
+        """
+        index = self._asin_index.get(asin)
+        return None if index is None else self._embeddings[index]
+
+    def encode_texts(self, texts: list[str]):
+        """Encode arbitrary text with the same vendored model and settings
+        used for query encoding, for callers comparing against catalog
+        vectors without indexing the text into the catalog store."""
+        if not texts:
+            return self._np.empty((0, self._embeddings.shape[1]), dtype="float32")
+        generated = self._model.encode(
+            texts,
+            device=OFFICIAL_DEVICE,
+            convert_to_numpy=True,
+            normalize_embeddings=True,
+            show_progress_bar=False,
+        )
+        return self._np.asarray(generated)
 
     def search(self, query: RetrievalQuery, k: int) -> list[Candidate]:
         try:
