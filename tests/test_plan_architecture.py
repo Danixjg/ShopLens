@@ -83,7 +83,11 @@ def test_environment_can_select_hybrid_config(
 
 
 def test_ablation_matrix_has_exact_names() -> None:
-    assert set(CONFIGS) == set("ABCDEFGHJKLMNOPQRSTUVWXYZ")
+    # "I" is free (every other single letter is used), but the next config
+    # is named "AA" rather than spending it -- the proposed next value under
+    # a spreadsheet-column-style scheme (A..Z, then AA, AB, ...), added to
+    # the expected set explicitly since it is not a single-character name.
+    assert set(CONFIGS) == set("ABCDEFGHJKLMNOPQRSTUVWXYZ") | {"AA"}
 
 
 def test_config_z_is_the_only_no_clarification_diagnostic() -> None:
