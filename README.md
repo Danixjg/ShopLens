@@ -111,24 +111,6 @@ python3 -m pytest -q
 Release page:
 <https://github.com/TechJam2026/techjam-conversational-search/releases/tag/participant-kit>
 
-Both downloads land in `data/`, where `.gitignore` already covers the archive
-and the decompressed catalog; `SHA256SUMS` is removed after the check so the
-working tree stays clean, which the reportable runner requires.
-`--ignore-missing` is required because `SHA256SUMS` also lists
-`techjam-participant-kit.zip`. That asset is the organizer's starter kit, which
-this repository already supersedes; it is not needed here and is deliberately
-not downloaded. Without the flag the check reports it missing and exits
-non-zero even when the catalog is correct. The decompressed file must be 50,000
-rows with SHA-256
-`da979b05a68af864cb0dcf9ee6a81c010c7e66a57978ad286c7a2e005fc69a67`, which
-`Agent` re-verifies at load time. Both digests, the row count, and the pinned
-public-set digest are recorded in
-[data provenance and integrity](docs/data-provenance.md); the dataset files
-themselves are described in [`data/README.md`](data/README.md). Note that
-`python3 -m pytest -q` passes with no catalog present, so it does not by itself
-confirm a complete setup; the
-digest above is the check that does.
-
 Install the portable optional dependencies before running hybrid configs. The
 first hybrid run then embeds all 50,000 products on CPU before its first
 session, which takes roughly 20-25 minutes and writes a ~70 MB cache to the
