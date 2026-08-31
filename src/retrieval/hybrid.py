@@ -113,7 +113,7 @@ def build_retriever(
     if config.retrieval_mode == "bm25":
         return BM25Retriever(catalog)
     try:
-        dense = DenseRetriever(catalog, model_path)
+        dense = DenseRetriever(catalog, model_path, text_recipe=config.dense_text_recipe)
     except DenseUnavailable:
         # Official scoring may be offline. A missing optional dense component
         # degrades to the deterministic BM25 route instead of failing a turn.

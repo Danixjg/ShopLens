@@ -15,10 +15,17 @@
 
 - [ ] A clean install reproduces config A without optional dependencies.
 - [ ] The locked dense environment reproduces configs B–H, P, and Q fully offline.
-- [ ] Clean reportable dev and holdout runs exist for retained config P.
+- [ ] Clean reportable dev and holdout runs exist for baseline P and for the
+      submission config T.
 - [x] Config Q has clean reportable dev evidence at `1b55d92`, exact P/Q
       membership parity, and an explicitly exploratory holdout result at
-      `5d5a486`; it has not replaced P as the retained config.
+      `5d5a486`.
+- [x] Config T is the submission configuration, with a dev row at `0371a54`
+      and an exploratory holdout row at `fae2970`. Its composition gate was
+      frozen before the run and required it to beat the best single component.
+- [x] Configs R and S remain the clean-holdout alternatives to T, each beating
+      P on both splits with untouched holdout rows, and both are published so
+      the submission does not report only its strongest number.
 - [x] Config U was rejected by its pre-registered dev gate and documented;
       holdout was not opened.
 - [x] Config U's clean `87834f4` dev record reports HR@10 `0.941667`, MRR
@@ -53,6 +60,27 @@
       International (CC BY 4.0).
 - [x] The local research transcript is ignored, untracked, and therefore absent
       from the Git-derived release bundle; no upstream code or data is bundled.
+- [x] Full research credit is present: Jingheng Ye, Yong Jiang, Xiaobin Wang,
+      Yinghui Li, Yangning Li, Hai-Tao Zheng, Pengjun Xie, and Fei Huang. 2024.
+      *ProductAgent: Benchmarking Conversational Product Search Agent with
+      Asking Clarification Questions*. arXiv:2407.00942 [cs.IR]; DOI
+      `10.48550/arXiv.2407.00942`; abstract page
+      `https://arxiv.org/abs/2407.00942`.
+- [x] The ProductAgent preprint is recorded as carrying the arXiv
+      non-exclusive distribution license 1.0, which grants no third-party
+      redistribution or derivative right. No copy or local conversion of it is
+      tracked, and `docs/ProductAgent.md` is Git-ignored and untracked.
+- [x] No ProductAgent-reported metric appears on a ShopLens results surface;
+      those values were measured on AliMe KG with an LLM agent and belong only
+      to `docs/productagent-integration.md`.
+
+- [x] Wizard of Shopping / TRACER credit and the adoption boundary are
+      recorded in `docs/wizard-of-shopping-integration.md`, and the local
+      conversion `docs/Wizard_of_Shopping.md` is Git-ignored and untracked.
+- [x] Both ideas that audit governs were measured under pre-registered dev
+      gates and neither was retained: U was rejected at `0.819730` against
+      P's `0.819939`, and V tied P exactly at `0.819939`. No WoS-reported
+      metric appears on a ShopLens results surface.
 
 ## Final package
 

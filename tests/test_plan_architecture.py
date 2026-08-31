@@ -11,7 +11,12 @@ import pytest
 import src.agent as agent_module
 from agent import Agent as SubmissionAgent
 from src.catalog import OFFICIAL_CATALOG_SHA256, Catalog
-from src.contracts.config import CONFIGS, PROFILE_RERANK_WEIGHT, get_run_config
+from src.contracts.config import (
+    CONFIGS,
+    PROFILE_RERANK_WEIGHT,
+    SUBMISSION_CONFIG_NAME,
+    get_run_config,
+)
 from src.contracts.response import AgentReply, Recommendation, Usage
 from src.contracts.retrieval import (
     BUYING_PRECISION_INTENTS,
@@ -65,8 +70,9 @@ def test_unknown_config_falls_back_to_a() -> None:
     assert get_run_config("typo") is CONFIGS["A"]
 
 
-def test_agent_defaults_to_reproducible_baseline(catalog_path: Path) -> None:
-    assert SubmissionAgent(catalog_path).config is CONFIGS["A"]
+def test_agent_defaults_to_the_submission_configuration(catalog_path: Path) -> None:
+    """The harness names no config, so the default is what gets graded."""
+    assert SubmissionAgent(catalog_path).config is CONFIGS[SUBMISSION_CONFIG_NAME]
 
 
 def test_environment_can_select_hybrid_config(
@@ -77,7 +83,7 @@ def test_environment_can_select_hybrid_config(
 
 
 def test_ablation_matrix_has_exact_names() -> None:
-    assert set(CONFIGS) == set("ABCDEFGHPQRSTUZ")
+    assert set(CONFIGS) == set("ABCDEFGHJNOPQRSTUVWXYZ")
 
 
 def test_config_z_is_the_only_no_clarification_diagnostic() -> None:
@@ -285,7 +291,10 @@ def test_shipped_configs_do_not_request_llm_rank() -> None:
 def test_agent_counts_guarded_response_failures(
     catalog_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    agent = SubmissionAgent(catalog_path)
+    # Pinned to A so the assertion covers exception accounting alone. The
+    # default is a hybrid config, which adds a truthful bm25_fallback reason
+    # wherever the optional dense extras are absent.
+    agent = SubmissionAgent(catalog_path, config="A")
     agent.reset("session", {})
 
     def fail(*args: object, **kwargs: object) -> dict:

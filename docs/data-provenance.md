@@ -36,3 +36,12 @@ data pipeline. See the
 [Wizard of Shopping source audit](wizard-of-shopping-integration.md) for the
 canonical citation, license evidence, adoption decisions, and future generated
 artifact metadata requirements.
+
+Clarification-quality and evaluation-reporting guards are additionally
+informed by Ye et al.'s ProductAgent (arXiv:2407.00942). No ProductAgent
+source file and no AliMe KG record is part of the data pipeline; that corpus
+sits outside the Amazon Reviews 2023 competition package and carries no
+verified dataset license. The paper itself is under the arXiv non-exclusive
+distribution license 1.0, so no copy or conversion of it is tracked. See the
+[ProductAgent source audit](productagent-integration.md) for the license
+finding and the adoption boundary.

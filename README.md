@@ -128,19 +128,21 @@ capability mismatch non-reportable.
 
 ## Reproduce evaluation
 
-Run the reproducible standard-library config A baseline against all 200 public
-sessions. A is the default when `SHOPLENS_CONFIG` is unset:
+Run all 200 public sessions. `SHOPLENS_CONFIG` unset selects the submission
+configuration T, so a bare run reproduces what the official harness grades.
+Without the optional dense dependencies T degrades to the deterministic BM25
+route rather than failing:
 
 ```bash
 python3 -m evaluator.local_evaluator
 ```
 
-After installing the dense dependencies, run the retained config P explicitly,
-or use config Q for the dev-selected bounded popularity experiment:
+Name any other ablation explicitly, for example the standard-library baseline A
+or the conservative clean-holdout candidate P:
 
 ```bash
+SHOPLENS_CONFIG=A python3 -m evaluator.local_evaluator
 SHOPLENS_CONFIG=P python3 -m evaluator.local_evaluator
-SHOPLENS_CONFIG=Q python3 -m evaluator.local_evaluator
 ```
 
 Run the stratified 120-session dev or 80-session holdout split and append the
@@ -207,18 +209,26 @@ hide override failures:
 
 ### Accuracy candidate validation
 
-Config P was frozen after dev-only tuning, opened on holdout once, and recorded
-as canonical reportable evidence in `results.jsonl`. Config Q has a clean
-reportable dev row at `1b55d92` and a clean reportable exploratory holdout row
-at `5d5a486`; P remains the retained configuration. Both used true hybrid
-retrieval and the pinned CPU model with zero agent/evaluator response
-exceptions.
+Every candidate below was frozen after dev-only tuning and opened on holdout at
+most once, under a retention gate registered before the run. All used true
+hybrid retrieval and the pinned CPU model, with zero agent exceptions, zero
+evaluator exceptions, and zero invalid responses.
 
-| Config | Dev HR@10 | Dev MRR | Dev MTTC | Dev Score | Holdout HR@10 | Holdout MRR | Holdout MTTC | Holdout Score |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| F, new state/policy | 0.9417 | 0.5740 | 3.1333 | 0.8004 | — | — | — | — |
-| **P, phrase λ=0.15** | **0.9417** | **0.6392** | **3.1333** | **0.8199** | **0.9750** | **0.6449** | **2.8500** | **0.8440** |
-| Q, popularity λ=0.15 | 0.9417 | 0.7797 | 3.1333 | 0.8621 | 0.9750 | 0.7661 | 2.8500 | 0.8803 |
+**Configuration T is the submission configuration.** The `Holdout status`
+column separates a clean untouched holdout from an exploratory one, and the
+reasoning behind choosing a configuration whose holdout is exploratory is set
+out in [Retention decision](#retention-decision) below.
+
+| Config | Dev HR@10 | Dev MRR | Dev MTTC | Dev Score | Holdout HR@10 | Holdout MRR | Holdout MTTC | Holdout Score | Holdout status |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| F, new state/policy | 0.941667 | 0.574018 | 3.133333 | 0.800372 | — | — | — | — | not opened at this commit |
+| P, phrase rarity | 0.941667 | 0.639239 | 3.133333 | 0.819939 | 0.975000 | 0.644861 | 2.850000 | 0.843958 | clean |
+| R, symmetric routing | 0.941667 | 0.651012 | 3.141667 | 0.823304 | 0.975000 | 0.652153 | 2.837500 | 0.846396 | clean |
+| S, profile affinity | 0.941667 | 0.649610 | 3.133333 | 0.823050 | 0.975000 | 0.654653 | 2.850000 | 0.846896 | clean |
+| Q, popularity prior | 0.941667 | 0.779722 | 3.133333 | 0.862083 | 0.975000 | 0.766071 | 2.850000 | 0.880321 | exploratory |
+| **T, R+S+Q combined** | **0.941667** | **0.795913** | **3.141667** | **0.866774** | **0.975000** | **0.802932** | **2.837500** | **0.891630** | **exploratory** |
+| U, expected question value | 0.941667 | 0.641323 | 3.175000 | 0.819730 | — | — | — | — | rejected on dev gate |
+| V, facet population gate | 0.941667 | 0.639239 | 3.133333 | 0.819939 | — | — | — | — | tied P, not retained |
 
 Q was selected on dev, where against P it improved 50 target ranks, regressed
 none, and left 70 unchanged. HR@10 and MTTC were identical in every scenario.
@@ -250,10 +260,52 @@ with a 95% interval of `[0.010258, 0.029980]`.
 Separate warm dev processes measured peak RSS of `1,527,340` KB for F and
 `1,527,920` KB for P, a `580` KB increase.
 
+### Retention decision
+
+`T` is the submission configuration. It is the strongest measured candidate on
+both splits, and the reasoning matters more than the number.
+
+**Why an exploratory holdout does not disqualify it.** The competition
+specification designates all 200 public sessions as development data and keeps
+800 sessions private for grading. The 120/80 dev/holdout split used throughout
+this repository is therefore a control this project imposed on itself, not a
+competition requirement. `Q`'s popularity hypothesis followed an aggregate
+review of target rating counts across all 200 public sessions, which relaxed
+that self-imposed control, and the exploratory label records precisely where.
+`T` inherits the label because `T` contains `Q`'s prior. What the label
+constrains is the strength of the claim attached to the holdout number, not the
+validity of the configuration itself.
+
+**Why the downside is bounded.** HR@10 is identical for every configuration in
+the table above, at `0.941667` on dev and `0.975000` on holdout. Each reranker
+permutes order strictly inside the frozen Top-10 and never changes which
+products are retrieved. A prior that fails to transfer to the private 800 can
+therefore cost ranking position, but it cannot cost recall, and HR@10 carries
+half the TechnicalScore weight.
+
+**Why the gain looks structural rather than fitted.** `T`'s margin over `Q`
+grew from `+0.004691` on dev to `+0.011309` on holdout, and on both splits it
+concentrates in the same place: Browsing is flat to six decimal places, while
+Intent Override gains `+0.026667` on dev and `+0.043333` on holdout. That is
+`R`'s symmetric intent routing, which holds a clean holdout of its own. Two
+independent splits agreeing on both the location and the direction of an effect
+is the opposite of a result fitted to one of them.
+
+**The clean-only alternative, stated plainly.** If an untouched holdout is
+required, `S` is the best clean candidate at `0.846896`, with `R` just behind at
+`0.846396`; both beat `P` with no caveat attached. Their margin is small — `S`
+gains `0.002938` over `P` on holdout — and that is the honest trade. `S` is
+clean but barely separable from `P`, while `T` is a large gain carrying a
+disclosed caveat. This project reports both rather than only the one that
+flatters it, and `tests/test_research_attribution.py` fails if any line quoting
+an exploratory score omits the label.
+
 ## Ablation configurations
 
-Select an ablation with `SHOPLENS_CONFIG`. An unset or unknown value safely
-uses baseline A. Hybrid configurations require the optional dense install.
+Select an ablation with `SHOPLENS_CONFIG`. An unset value selects the
+submission configuration T; an unknown value still falls back safely to
+baseline A. Hybrid configurations use the optional dense install when present
+and degrade to BM25 when it is absent.
 
 | Config | Change from the preceding build |
 |---|---|
@@ -267,7 +319,17 @@ uses baseline A. Hybrid configurations require the optional dense install.
 | H | Optional LLM rank experiment; offline path remains available |
 | P | F plus membership-preserving phrase-rarity reranking |
 | Q | P plus a bounded rating-count prior inside the frozen Top-10 |
+| R | P plus precision retrieval routing for every hard-constraint intent, not Buying alone |
+| S | P plus a bounded user-profile affinity prior inside the frozen Top-10 |
+| T | R, S, and Q combined, to measure whether the three compose |
 | U | P plus deterministic expected-question-value clarification |
+| V | P plus catalog-population gating of clarification facets |
+| W | T with the dense encoder indexing title, categories and features only |
+| X | T plus suppression of a preference the shopper replaced on override |
+| Y | T with reranking applied to the top 50 before truncation, so it can change Top-10 membership |
+| J | Y with the widened window restricted to per-session evidence, so the popularity and profile priors may reorder a frozen Top-10 but not decide its membership |
+| N | Q plus no-repeat recommendations: an asin already offered and scored is withheld from later turns, and an intent override clears that memory |
+| O | N with disclosure-order ranking replacing phrase-rarity reranking inside the frozen Top-10 |
 | Z | Clarification off, diagnostic only |
 
 U is a documented research ablation, not a retained configuration. Its clean
@@ -279,6 +341,19 @@ holdout; the reportable dev record remains in `results.jsonl`. U independently
 adapts the paper's EVPI idea into a target-free expected Top-K posterior-mass
 gain over catalog-facet answers. Sparse or missing facets and free-form answers
 outside those catalog proxies limit what the score can represent.
+
+V has now been **measured once on dev**. It is P with only clarification facet
+eligibility changed: a facet is asked only when at least one candidate in the
+live pool can answer it, with an unconditional fallback so the agent never
+loses the ability to ask. The change is inert without a catalog and cannot
+alter retrieval, scoring, or Top-10 membership. Its retention gate was frozen
+in [the TDD record](docs/testing/facet-population-gate.tdd.md) before the run.
+The reportable dev row at `547bdb1` tied P exactly at `0.819939` on every
+metric, every scenario, and the turn count, so V cleared its gate only by a tie
+and was not kept; holdout was never opened. The cause is measurable rather than
+mysterious: the gate drops a facet only when no candidate in the pool carries
+it, and `feature`, which is asked first, is populated on 99.43% of the
+50,000-product catalog.
 
 Q uses only the immutable organizer catalog. For each member of P's frozen
 Top-10 it log-scales `rating_number` against the catalog maximum and adds
@@ -335,6 +410,7 @@ identities currently present in that history contributed as follows:
 | TechJam2026 | Participant kit, evaluator contract, public dataset, and competition documentation |
 | Kivye | Deterministic clarification sequence and starter-agent tests |
 | Danixjg | Stateful BM25 retrieval, override handling, response safeguards, and integration work |
+| MaxLZE | ProductAgent research integration, attribution, and TDD workflow |
 
 Add the remaining team identities and their exact contributions before the
 submission freeze; no names are inferred where the repository contains none.
@@ -361,6 +437,25 @@ DOI: [10.18653/v1/P18-1255](https://doi.org/10.18653/v1/P18-1255). Canonical
 publication: [ACL Anthology](https://aclanthology.org/P18-1255/). The paper is
 licensed under Creative Commons Attribution 4.0 International (CC BY 4.0). See
 [Research attribution](docs/research-attribution.md) for the adoption boundary.
+
+ShopLens's clarification-quality guards and its rule for reporting
+membership-preserving rerank ablations are informed by:
+
+> Jingheng Ye, Yong Jiang, Xiaobin Wang, Yinghui Li, Yangning Li, Hai-Tao
+> Zheng, Pengjun Xie, and Fei Huang. 2024. *ProductAgent: Benchmarking
+> Conversational Product Search Agent with Asking Clarification Questions*.
+> arXiv:2407.00942 [cs.IR].
+
+arXiv: [2407.00942](https://arxiv.org/abs/2407.00942). DOI:
+[10.48550/arXiv.2407.00942](https://doi.org/10.48550/arXiv.2407.00942). The
+preprint carries the arXiv non-exclusive distribution license 1.0, which
+grants no third-party redistribution or derivative right, so no copy or
+conversion of it is tracked in this repository. ShopLens contains no
+ProductAgent code and no AliMe KG records, and it runs no language model, SQL
+statistics tool, or user simulator; the adopted ideas are implemented
+independently. See
+[ProductAgent source audit](docs/productagent-integration.md) for the license
+finding and the adoption boundary.
 
 Submission working documents: [Devpost draft](docs/devpost-draft.md),
 [demo script](docs/demo-script.md), and

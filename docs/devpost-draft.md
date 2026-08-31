@@ -68,11 +68,13 @@ inside P's already-frozen Top-10. It preserves P's relevance score and adds a
 maximum-weighted `0.15 * popularity / 61` bonus, without filtering products or
 changing catalog membership. Q scored `0.862083` on dev (HR@10 `0.941667`, MRR
 `0.779722`, MTTC `3.133333`): 50 target ranks improved, none regressed, and all
-four scenario MRRs increased. A later clean reportable holdout row scored
-`0.880321` (HR@10 `0.975`, MRR `0.766071`, MTTC `2.85`). Q is not yet claimed
-as the retained configuration. The idea followed an aggregate review of target
-rating counts across all public sessions, so its holdout result is exploratory
-rather than statistically untouched. A paired, scenario-stratified
+four scenario MRRs increased. A later reportable holdout row scored an
+exploratory `0.880321` (HR@10 `0.975`, MRR `0.766071`, MTTC `2.85`). The idea
+followed an aggregate review of target rating counts across all public
+sessions, so that holdout result is exploratory rather than statistically
+untouched. Note that a clean *run* and a clean *holdout* are different claims:
+every row cited here came from a clean reportable run, while only some rows
+come from an untouched split. A paired, scenario-stratified
 10,000-resample bootstrap (seed 2026) estimated Q's dev TechnicalScore gain
 over P at `0.042145`, with a 95% interval of `[0.030926, 0.054362]`.
 
@@ -84,6 +86,22 @@ from the historical F `0.166667/0.25` to P `1.0/0.75` on dev/holdout; Buying,
 Browsing, and Intent Override also improved or held in aggregate. Configs G and
 H are not claimed because no plan-specified offline cross-encoder or LLM
 provider exists.
+
+Three further candidates were measured after Q. `R` (symmetric intent routing)
+and `S` (bounded profile affinity) each cleared the same gate on both splits
+and hold clean, untouched holdout rows of `0.846396` and `0.846896`. `T`
+combines `R`, `S`, and `Q` under a composition gate frozen before the run,
+which required it to beat not merely `P` but the best single component. It
+scored `0.866774` on dev and an exploratory `0.891630` on holdout, inheriting
+Q's label because it carries Q's prior.
+
+**`T` is the submission configuration.** Its downside is bounded: HR@10 is
+identical across every candidate at `0.941667` on dev and `0.975` on holdout,
+so the rerankers permute order strictly inside the frozen Top-10 and cannot
+cost recall. Its advantage over `Q` also replicates across both splits and
+localises to Intent Override, which is `R`'s contribution and holds a clean
+holdout of its own. If an untouched holdout is required instead, `S` is the
+best clean candidate; we report both rather than only the stronger one.
 
 The research-derived U ablation replaced only P's information-gain question
 policy with deterministic expected-question-value scoring. On a clean dev run

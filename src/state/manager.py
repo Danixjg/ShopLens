@@ -25,6 +25,11 @@ def apply_parsed_turn(state: SessionState, parsed: ParsedTurn, user_message: str
         state.category = parsed.category
 
     if parsed.is_override:
+        # A hit cannot register before the override turn, so an asin offered
+        # earlier was never tested against the target. Treating those as
+        # proven-wrong would ban the target permanently, so the negative
+        # evidence is discarded and they become offerable again.
+        state.shown_asins.clear()
         state.intent = "intent_override"
         # Retire the original preference, not useful constraints disclosed on
         # later clarification turns. Disclosures now accumulate rather than
@@ -35,6 +40,7 @@ def apply_parsed_turn(state: SessionState, parsed: ParsedTurn, user_message: str
             for slot in state.slots:
                 if slot.active and not slot.hard and slot.source_turn == superseded_turn:
                     slot.active = False
+                    slot.superseded = True
     elif parsed.intent is not None:
         # Only a turn that actually declares intent may change the route.
         state.intent = parsed.intent
