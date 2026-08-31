@@ -30,11 +30,13 @@ deterministic parser ----> multi-value slots / override erasure
                  \          /
              reciprocal-rank fusion
                        |
+      withhold already-shown asins (submission)
+                       |
      bounded per-attribute constraint scoring
                        |
              freeze Top-K membership
                        |
-       optional phrase-rarity reranking
+  disclosure-order or phrase-rarity reranking
                        |
  information-gain clarification + guarded response
 ```
@@ -46,7 +48,7 @@ The implementation is split by responsibility:
 - `src/parsing/` and `src/state/`: controlled-language parsing, slot transitions, and query construction.
 - `src/retrieval/`: weighted FTS5 BM25, optional local dense retrieval, and reciprocal-rank fusion.
 - `src/scoring/`: bounded non-filtering constraint evidence, dynamic routes,
-  and membership-preserving phrase-rarity reranking.
+  and membership-preserving reranking by disclosure order or phrase rarity.
 - `src/policy/`: candidate-facet information gain plus an experimental
   expected-question-value mode, with targeted fallback and persistent
   per-attribute decline handling.
@@ -129,8 +131,8 @@ capability mismatch non-reportable.
 ## Reproduce evaluation
 
 Run all 200 public sessions. `SHOPLENS_CONFIG` unset selects the submission
-configuration T, so a bare run reproduces what the official harness grades.
-Without the optional dense dependencies T degrades to the deterministic BM25
+configuration O, so a bare run reproduces what the official harness grades.
+Without the optional dense dependencies O degrades to the deterministic BM25
 route rather than failing:
 
 ```bash
@@ -214,7 +216,9 @@ most once, under a retention gate registered before the run. All used true
 hybrid retrieval and the pinned CPU model, with zero agent exceptions, zero
 evaluator exceptions, and zero invalid responses.
 
-**Configuration T is the submission configuration.** The `Holdout status`
+**Configuration O is the submission configuration.** T is the previous
+submission and remains the canonical comparison used throughout the
+experiments; Q is the parent both branches descend from. The `Holdout status`
 column separates a clean untouched holdout from an exploratory one, and the
 reasoning behind choosing a configuration whose holdout is exploratory is set
 out in [Retention decision](#retention-decision) below.
@@ -226,7 +230,9 @@ out in [Retention decision](#retention-decision) below.
 | R, symmetric routing | 0.941667 | 0.651012 | 3.141667 | 0.823304 | 0.975000 | 0.652153 | 2.837500 | 0.846396 | clean |
 | S, profile affinity | 0.941667 | 0.649610 | 3.133333 | 0.823050 | 0.975000 | 0.654653 | 2.850000 | 0.846896 | clean |
 | Q, popularity prior | 0.941667 | 0.779722 | 3.133333 | 0.862083 | 0.975000 | 0.766071 | 2.850000 | 0.880321 | exploratory |
-| **T, R+S+Q combined** | **0.941667** | **0.795913** | **3.141667** | **0.866774** | **0.975000** | **0.802932** | **2.837500** | **0.891630** | **exploratory** |
+| T, R+S+Q combined (previous submission) | 0.941667 | 0.795913 | 3.141667 | 0.866774 | 0.975000 | 0.802932 | 2.837500 | 0.891630 | exploratory |
+| N, Q plus no-repeat | — | — | — | — | — | — | — | — | diagnostic only, no reportable row |
+| **O, N plus disclosure-order rank (submission)** | **0.983333** | **0.844722** | **2.833333** | **0.908416** | **0.987500** | **0.795982** | **2.687500** | **0.898795** | **exploratory** |
 | U, expected question value | 0.941667 | 0.641323 | 3.175000 | 0.819730 | — | — | — | — | rejected on dev gate |
 | V, facet population gate | 0.941667 | 0.639239 | 3.133333 | 0.819939 | — | — | — | — | tied P, not retained |
 
@@ -262,8 +268,25 @@ Separate warm dev processes measured peak RSS of `1,527,340` KB for F and
 
 ### Retention decision
 
-`T` is the submission configuration. It is the strongest measured candidate on
-both splits, and the reasoning matters more than the number.
+`O` is the submission configuration. `T` is the previous submission and stays
+in this document as the canonical comparison used throughout the experiments;
+`Q` is the parent both branches descend from. The reasoning matters more than
+the number.
+
+```text
+Q
+├── N = Q + exclude_shown
+│   └── O = N + ordered_rerank    <- CURRENT SUBMISSION CONFIGURATION
+│
+└── T = Q + symmetric_intent_routing + profile_rerank
+                                   <- PREVIOUS COMPARISON CONFIGURATION
+```
+
+`N` and `O` are one-flag steps along a single branch, and `T` is a sibling of
+`N` rather than an ancestor. The five flags separating `T` from `O` are
+genealogical distance between two children of `Q`, not a change set applied to
+`T`; reading them as a change set makes the difference look larger and less
+attributable than it is.
 
 **Why an exploratory holdout does not disqualify it.** The competition
 specification designates all 200 public sessions as development data and keeps
@@ -272,38 +295,63 @@ this repository is therefore a control this project imposed on itself, not a
 competition requirement. `Q`'s popularity hypothesis followed an aggregate
 review of target rating counts across all 200 public sessions, which relaxed
 that self-imposed control, and the exploratory label records precisely where.
-`T` inherits the label because `T` contains `Q`'s prior. What the label
-constrains is the strength of the claim attached to the holdout number, not the
-validity of the configuration itself.
+`O` inherits the label twice over: it contains `Q`'s prior, and it was itself
+selected from dev-split flag isolation. `T` carries the label for the first
+reason alone. What the label constrains is the strength of the claim attached
+to the holdout number, not the validity of the configuration itself.
 
-**Why the downside is bounded.** HR@10 is identical for every configuration in
-the table above, at `0.941667` on dev and `0.975000` on holdout. Each reranker
-permutes order strictly inside the frozen Top-10 and never changes which
-products are retrieved. A prior that fails to transfer to the private 800 can
-therefore cost ranking position, but it cannot cost recall, and HR@10 carries
-half the TechnicalScore weight.
+**What the gain is attributable to.** Runtime-only one-flag ablations anchored
+on `O`, with an `O` control reproducing its dev row to six decimal places,
+decompose the dev margin with no residual: `Q` at `0.862083`, plus
+`exclude_shown` gives `N` at `0.904250`, plus `ordered_rerank` gives `O` at
+`0.908416`. Removing `exclude_shown` from `O` returns HR@10 to `0.941667` —
+`T`'s value — in every scenario individually, so exclusion is necessary and
+sufficient for the entire dev HitRate gain. `ordered_rerank` cannot change
+Top-10 membership by construction and contributes ranking order only. Both of
+`T`'s extra flags measured negative when added to this branch. `N` holds no
+reportable row: it is the middle rung of the decomposition, and the figure
+quoted for it here is diagnostic, not evidence.
 
-**Why the gain looks structural rather than fitted.** `T`'s margin over `Q`
-grew from `+0.004691` on dev to `+0.011309` on holdout, and on both splits it
-concentrates in the same place: Browsing is flat to six decimal places, while
-Intent Override gains `+0.026667` on dev and `+0.043333` on holdout. That is
-`R`'s symmetric intent routing, which holds a clean holdout of its own. Two
-independent splits agreeing on both the location and the direction of an effect
-is the opposite of a result fitted to one of them.
+**What transferred to holdout, and what did not.** HitRate and MTTC
+transferred; MRR did not. The single extra holdout conversion lands in Intent
+Override, taking it from 11 of 12 to 12 of 12 — the same scenario that reached
+a perfect score on dev, and the one the mechanism names, since
+`src/state/manager.py` clears the shown-asin memory on an intent override
+because a hit cannot register before the override turn. MTTC improved on both
+splits, by `0.308334` turns on dev and `0.150000` on holdout. MRR moved the
+other way: `+0.048809` on dev against `-0.006950` on holdout, which is a sign
+reversal rather than shrinkage. The aggregate margin over `T` fell from
+`+0.041642` on dev to `+0.007165` on holdout; headroom explains part of that,
+since `T` misses seven of 120 dev sessions but only two of 80 holdout sessions,
+and it does not explain all of it. `O` is retained on the mechanism and on the
+two components that replicated, not on the TechnicalScore margin.
+
+**Why the downside is bounded.** Exclusion is the one component here that can
+change Top-10 membership, and it changes it in a single direction: it withholds
+products a session has already returned and scored. A safety valve in
+`src/agent.py` keeps the unfiltered pool whenever filtering would empty it, so
+the mechanism cannot cost recall, and every other reranker permutes order
+strictly inside the frozen Top-10. The exposure worth naming is a different
+one. "The session continued, therefore none of those was the target" is a proof
+under this evaluator, which scores every returned asin and stops at the first
+hit, but only an inference in deployment. Part of the gain is coupled to the
+evaluation protocol rather than to recommendation quality, and that is stated
+here rather than left for a reader to discover.
 
 **The clean-only alternative, stated plainly.** If an untouched holdout is
 required, `S` is the best clean candidate at `0.846896`, with `R` just behind at
 `0.846396`; both beat `P` with no caveat attached. Their margin is small — `S`
 gains `0.002938` over `P` on holdout — and that is the honest trade. `S` is
-clean but barely separable from `P`, while `T` is a large gain carrying a
-disclosed caveat. This project reports both rather than only the one that
+clean but barely separable from `P`, while `O` is a large dev gain and a small
+holdout gain carrying a disclosed caveat. This project reports both rather than
+only the one that
 flatters it, and `tests/test_research_attribution.py` fails if any line quoting
 an exploratory score omits the label.
 
 ## Ablation configurations
 
 Select an ablation with `SHOPLENS_CONFIG`. An unset value selects the
-submission configuration T; an unknown value still falls back safely to
+submission configuration O; an unknown value still falls back safely to
 baseline A. Hybrid configurations use the optional dense install when present
 and degrade to BM25 when it is absent.
 
