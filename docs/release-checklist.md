@@ -15,12 +15,14 @@
 
 - [ ] A clean install reproduces config A without optional dependencies.
 - [ ] The locked dense environment reproduces configs B–H, P, and Q fully offline.
-- [ ] Clean reportable dev and holdout runs exist for baseline P and for the
-      submission config T.
+- [ ] Clean reportable dev and holdout runs exist for baseline P and the
+      evaluator default O+.
+- [ ] Promote O+'s diagnostic figures to clean reportable evidence before
+      treating them as retained results.
 - [x] Config Q has clean reportable dev evidence at `1b55d92`, exact P/Q
       membership parity, and an explicitly exploratory holdout result at
       `5d5a486`.
-- [x] Config T is the submission configuration, with a dev row at `0371a54`
+- [x] Config T was a previous submission configuration, with a dev row at `0371a54`
       and an exploratory holdout row at `fae2970`. Its composition gate was
       frozen before the run and required it to beat the best single component.
 - [x] Configs R and S remain the clean-holdout alternatives to T, each beating
@@ -29,7 +31,7 @@
 - [x] Config K fixes disclosure segmentation: a catalog value containing a
       semicolon is no longer split into several constraints. Its pre-registered
       dev gate, frozen before the run, is that K must **strictly beat** O's
-      `0.908416`; a tie does not justify moving the submission configuration.
+      `0.908416`; a tie does not justify changing the retained configuration.
       Segmentation correctness was measured first and separately, against the
       simulator's own disclosure list rather than against a score: over-splits
       fall from 3 to 0 on dev and 3 to 0 on holdout, with under-splits at 0 on
@@ -39,8 +41,9 @@
       Result: K tied O exactly at `0.908416` on a clean dev run at `6c8135f`
       (HR@10 `0.983333`, MRR `0.844722`, MTTC `2.833333`, zero exceptions,
       `config_flags.catalog_grounded_segmentation: true`). A tie does not clear
-      the gate, so the flag stays off, O remains the submission, and holdout was
-      not opened. The correction and its property test are retained.
+      the gate, so the flag stays off, O remains the latest configuration with
+      reportable evidence, and holdout was not opened. The correction and its
+      property test are retained.
 - [x] Config U was rejected by its pre-registered dev gate and documented;
       holdout was not opened.
 - [x] Config U's clean `87834f4` dev record reports HR@10 `0.941667`, MRR

@@ -13,6 +13,7 @@ from agent import Agent as SubmissionAgent
 from src.catalog import OFFICIAL_CATALOG_SHA256, Catalog
 from src.contracts.config import (
     CONFIGS,
+    FALLBACK_CONFIG_NAME,
     PROFILE_RERANK_WEIGHT,
     SUBMISSION_CONFIG_NAME,
     get_run_config,
@@ -67,10 +68,16 @@ def test_entry_points_are_the_same_implementation() -> None:
 
 
 def test_unknown_config_falls_back_to_a() -> None:
-    assert get_run_config("typo") is CONFIGS["A"]
+    assert FALLBACK_CONFIG_NAME == "A"
+    assert get_run_config("typo") is CONFIGS[FALLBACK_CONFIG_NAME]
 
 
-def test_agent_defaults_to_the_submission_configuration(catalog_path: Path) -> None:
+def test_unset_config_defaults_to_o_plus(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("SHOPLENS_CONFIG", raising=False)
+    assert get_run_config() is CONFIGS["O+"]
+
+
+def test_agent_defaults_to_the_evaluator_configuration(catalog_path: Path) -> None:
     """The harness names no config, so the default is what gets graded."""
     assert SubmissionAgent(catalog_path).config is CONFIGS[SUBMISSION_CONFIG_NAME]
 
@@ -83,7 +90,7 @@ def test_environment_can_select_hybrid_config(
 
 
 def test_ablation_matrix_has_exact_names() -> None:
-    assert set(CONFIGS) == set("ABCDEFGHJNOPQRSTUVWXYZ") | {"O+"}
+    assert set(CONFIGS) == set("ABCDEFGHJNOPQRSTUVWXYZ") | {"K", "L", "M", "AA", "O+"}
 
 
 def test_config_z_is_the_only_no_clarification_diagnostic() -> None:

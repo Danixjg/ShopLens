@@ -53,6 +53,8 @@ class RunConfig:
     # splitting on every semicolon. Catalog text uses ";" as punctuation, so
     # the separator is not reserved and one value can look like several.
     catalog_grounded_segmentation: bool = False
+    extended_clarification: bool = False
+    skip_covered_attributes: bool = False
     popularity_rerank_weight: float = 0.0
     profile_rerank_weight: float = 0.0
     dense_text_recipe: DenseTextRecipe = "full"
@@ -423,9 +425,10 @@ CONFIGS["O+"] = replace(
     soft_floor=0.889,
 )
 
-# The configuration the submission claims and is graded on. Documented in
-# the README under "Retention decision"; a test binds the two together.
-SUBMISSION_CONFIG_NAME = "O"
+# The evaluator default and its dependency-free safety net. The README names
+# both values, and tests bind the runtime resolver to that documentation.
+SUBMISSION_CONFIG_NAME = "O+"
+FALLBACK_CONFIG_NAME = "A"
 
 
 def get_run_config(name: str | None = None) -> RunConfig:
@@ -441,4 +444,4 @@ def get_run_config(name: str | None = None) -> RunConfig:
     """
     fallback = os.getenv("SHOPLENS_CONFIG", SUBMISSION_CONFIG_NAME)
     selected = (name if name is not None else fallback).strip().upper()
-    return CONFIGS.get(selected, CONFIGS["A"])
+    return CONFIGS.get(selected, CONFIGS[FALLBACK_CONFIG_NAME])
