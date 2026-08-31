@@ -55,7 +55,7 @@
     <li><a href="#usage">Usage</a></li>
     <li><a href="#results">Results</a></li>
     <li><a href="#limitations">Limitations</a></li>
-    <li><a href="#roadmap">Roadmap</a></li>
+    <li><a href="#project-status">Project status</a></li>
     <li><a href="#contributing">Contributing</a></li>
     <li><a href="#license-and-data-use">License and data use</a></li>
     <li><a href="#contact">Contact</a></li>
@@ -92,15 +92,15 @@ network access after setup, and zero tokens either way.
 
 ### A real session
 
-Verbatim output of `python3 scripts/demo_session.py --config O`, trimmed to the
+Verbatim output of `python3 scripts/demo_session.py --config O+`, trimmed to the
 first three products per turn:
 
 ```text
-config O | retrieval hybrid | clarification info_gain | catalog 50000 products
+config O+ | retrieval hybrid | clarification info_gain | catalog 50000 products
 
 ─── turn 1 ──────────────────────────────────────────────────────────
 customer : I'm looking for Shoes, but I'm still exploring.
-agent    : I found many plausible matches. Do you have a feature preference?
+agent    : Do you have a feature preference?
 asks     : feature
 top 10   :
    1. THE NORTH FACE Aphrodite Motion 4in Womens Shorts                B07XVS4BKZ
@@ -110,18 +110,18 @@ top 10   :
 
 ─── turn 2 ──────────────────────────────────────────────────────────
 customer : For that, what matters is: waterproof; leather.
-agent    : I found many plausible matches. Do you have a color preference?
-asks     : color
+agent    : Do you have a material preference?
+asks     : material
 top 10   :
-   1. Timberland Toddler/Little Kid Field Boot 6" Hiker                B001UE70D0
-   2. KIWI Shoe Waterproofer Protector                                 B0B7J5CBDK
-   3. Under Armour Men's Field Ops GORE-TEX                            B01MQKGWS7
+   1. Keen Men's Gypsum II Waterproof Hiking Boot                      B01N1GPAHF
+   2. Timberland Unisex-Adult Boondock Hd 6" Composite Safety Toe Wat… B0B9VFPNF7
+   3. Rockport Men's Redemption Road Waterproof Plain Toe Shoe- Black… B00SXZ5LEY
    ... 7 more
 
 ─── turn 3 ──────────────────────────────────────────────────────────
 customer : Actually, ignore my earlier preference. What I need is: cotton.
-agent    : Do you have a material preference?
-asks     : material
+agent    : Do you have a color preference?
+asks     : color
 top 10   :
    1. Timberland Men's Chestnut Ridge Waterproof Boot                  B00JC33QVQ
    2. Littleplum Boys Snow Boots Winter Waterproof Antiskid Boots Hik… B08FFTK17T
@@ -286,7 +286,7 @@ python3 -m evaluator.local_evaluator
 **Watch a single conversation** turn by turn:
 
 ```bash
-python3 scripts/demo_session.py --config O
+python3 scripts/demo_session.py --config O+
 ```
 
 The script draws box-rule characters, so on a Windows console prefix it with
@@ -306,7 +306,7 @@ optional, and the defaults are what the official harness gets.
 
 | Variable | Default | What it does |
 |---|---|---|
-| `SHOPLENS_CONFIG` | submission configuration `O` | Picks a named configuration. An unknown name falls back to baseline `A`. Read in `src/contracts/config.py`. |
+| `SHOPLENS_CONFIG` | submission configuration `O+` | Picks a named configuration. An unknown name falls back to baseline `A`. Read in `src/contracts/config.py`. |
 | `SHOPLENS_CATALOG_SHA256` | unset | Checks a **custom** catalog file against a digest you supply. The official catalog path is always verified anyway, and this cannot switch that off. Read in `src/agent.py`. |
 
 There is no API key, token or endpoint variable, because the agent never makes a
@@ -379,21 +379,27 @@ evidence, which is why that file is untracked here.
 
 ## Results
 
-Over the 200 public sessions, with the submission configuration:
+Over the 200 public sessions:
 
-| Search route | Found target (HR@10) | Rank quality (MRR) | Turns to find it (MTTC) | Score |
+| Configuration and route | Found target (HR@10) | Rank quality (MRR) | Turns to find it (MTTC) | Score |
 |---|---:|---:|---:|---:|
-| Keyword + meaning-based | 0.985 | 0.825226 | 2.775 | **0.904568** |
-| Keyword only (fallback) | 0.985 | 0.880478 | 3.000 | **0.916643** |
+| **O+ (submission)**, keyword + meaning-based | 0.9850 | 0.8708 | 2.9250 | **0.9152** |
+| O (previous submission), keyword + meaning-based | 0.985 | 0.825226 | 2.775 | 0.904568 |
+| O (previous submission), keyword only fallback | 0.985 | 0.880478 | 3.000 | 0.916643 |
 
-**Read that second row carefully: the keyword-only fallback is not a
-downgrade on this set — it scores higher.** Both routes find the target in the
-same 98.5% of sessions; the keyword-only route ranks it a little better once
-found, and takes a little longer to get there. Do not read the higher number as an improvement, and do not compare
-either against the split tables below, which are meaning-based only and computed
-on 120/80 splits rather than all 200 sessions. To tell which route produced a
-number, check `effective_retriever` in a `src.eval.runner` row, or simply whether
-`numpy` and `sentence-transformers` are importable.
+O+ is O with eight scoring constants refitted; it changes ranking order, not
+which products are retrieved, which is why hit rate is identical and the gain is
+in MRR.
+
+**Read the last row carefully: the keyword-only fallback is not a downgrade on
+this set — it scores higher than the route it falls back from.** Both routes
+find the target in the same 98.5% of sessions; the keyword-only route ranks it a
+little better once found, and takes a little longer to get there. Do not read
+that as an improvement, and do not compare it against the split tables below,
+which are meaning-based only and computed on 120/80 splits rather than all 200
+sessions. The fallback route has not been measured for O+. To tell which route
+produced a number, check `effective_retriever` in a `src.eval.runner` row, or
+simply whether `numpy` and `sentence-transformers` are importable.
 
 For reference, the organizers' starter agent — which never asks a question —
 scores HR@10 `0.125`, MRR `0.068034`, MTTC `9.81` and `0.10671` overall, as
@@ -422,9 +428,11 @@ opened on holdout at most once, against a retention gate written down before the
 run. All used the meaning-based route and the pinned CPU model, with zero agent
 exceptions, zero evaluator exceptions and zero invalid responses.
 
-**Configuration O is the submission configuration.** T is the previous
-submission and stays here as the comparison used throughout the experiments; Q is
-the parent both branches descend from. The last column separates a holdout that
+**Configuration O+ is the submission configuration.** It is O with eight
+scoring constants refitted, so every experiment below — all of which are
+anchored on O — carries over unchanged. O is the previous submission, T the one
+before that and the comparison used throughout these experiments, and Q the
+parent both branches descend from. The last column separates a holdout that
 was never influenced by tuning ("clean") from one that was ("exploratory"); the
 reasoning for shipping a configuration whose holdout is exploratory is set out
 below.
@@ -436,9 +444,10 @@ below.
 | R, symmetric routing | 0.941667 | 0.651012 | 3.141667 | 0.823304 | 0.975000 | 0.652153 | 2.837500 | 0.846396 | clean |
 | S, profile affinity | 0.941667 | 0.649610 | 3.133333 | 0.823050 | 0.975000 | 0.654653 | 2.850000 | 0.846896 | clean |
 | Q, popularity prior | 0.941667 | 0.779722 | 3.133333 | 0.862083 | 0.975000 | 0.766071 | 2.850000 | 0.880321 | exploratory |
-| T, R+S+Q combined (previous submission) | 0.941667 | 0.795913 | 3.141667 | 0.866774 | 0.975000 | 0.802932 | 2.837500 | 0.891630 | exploratory |
+| T, R+S+Q combined (earlier submission) | 0.941667 | 0.795913 | 3.141667 | 0.866774 | 0.975000 | 0.802932 | 2.837500 | 0.891630 | exploratory |
 | N, Q plus no-repeat | — | — | — | — | — | — | — | — | diagnostic only, no reportable row |
-| **O, N plus disclosure-order rank (submission)** | **0.983333** | **0.844722** | **2.833333** | **0.908416** | **0.987500** | **0.795982** | **2.687500** | **0.898795** | **exploratory** |
+| O, N plus disclosure-order rank (previous submission) | 0.983333 | 0.844722 | 2.833333 | 0.908416 | 0.987500 | 0.795982 | 2.687500 | 0.898795 | exploratory |
+| **O+, O with refitted weights (submission)** | **0.9833** | **0.8887** | **2.9667** | **0.9189** | **0.9875** | **0.8439** | **2.8625** | **0.9097** | **fit saw holdout sessions** |
 | U, expected question value | 0.941667 | 0.641323 | 3.175000 | 0.819730 | — | — | — | — | rejected on dev gate |
 | V, facet population gate | 0.941667 | 0.639239 | 3.133333 | 0.819939 | — | — | — | — | tied P, not retained |
 
@@ -449,7 +458,8 @@ been measured against a frozen gate; N is the middle rung of the O
 decomposition. `results.jsonl` is the source of truth for what has actually been
 run.
 
-**Per scenario, for the submission configuration O:**
+**Per scenario, for O**, which every ablation below is anchored on. The same
+breakdown for O+ has not been produced:
 
 | Scenario | Dev HR@10 | Dev MRR | Dev MTTC | Holdout HR@10 | Holdout MRR | Holdout MTTC |
 |---|---:|---:|---:|---:|---:|---:|
@@ -598,7 +608,7 @@ the cost of never asking anything.
 
 <br />
 
-Pick one with `SHOPLENS_CONFIG`. Unset selects the submission configuration O;
+Pick one with `SHOPLENS_CONFIG`. Unset selects the submission configuration O+;
 an unknown value falls back safely to baseline A. Configurations that use
 meaning-based search degrade to keyword-only when the optional packages are
 absent.
@@ -625,15 +635,15 @@ absent.
 | Y | T with reranking applied to the top 50 before truncation, so it can change which ten appear |
 | J | Y with the widened window restricted to per-session evidence, so the popularity and profile nudges may reorder a frozen top ten but not decide its membership |
 | N | Q plus no-repeat: a product already offered and scored is withheld later, and an override clears that memory |
-| O | N with disclosure-order ranking replacing phrase-rarity reranking inside the frozen top ten |
+| O | N with disclosure-order ranking replacing phrase-rarity reranking inside the frozen top ten (previous submission) |
 | Z | Clarification off, diagnostic only |
 | M | O with disclosures resolved against known catalog values, so a feature bullet containing a semicolon stays one preference; measured on dev under its former letter K, tied O, gate not cleared |
 | K | O with the clarification question sequence extended by "budget", reached once feature, material and colour are exhausted; experimental, not yet gated |
 | L | O with clarification skipping an attribute the shopper has already covered; experimental, not yet gated |
 | AA | O with clarification chosen by embedding similarity to the near-miss pool (ranks 11–50) instead of discrete question splitting; experimental, not yet gated. Named "AA" as the next spreadsheet-style column after Z — an open question for the team, not a unilateral decision |
-| O+ | O with its eight scoring magnitudes fitted rather than guessed (experimental; O itself is unchanged) |
+| O+ | O with its eight scoring magnitudes fitted rather than guessed — **the submission**; O itself is unchanged |
 
-**About O+.** It leaves every structural choice in O intact and only replaces
+**About O+, the submission.** It leaves every structural choice in O intact and only replaces
 eight previously-guessed numbers — the fused-score multiplier, the precision
 route's lexical weight, the match bonus, the material/color/default penalties,
 and the soft-preference decay and floor. They were learned by black-box search
@@ -645,10 +655,8 @@ byte for byte, and a test asserts O's numbers are identical after the weights
 were exposed.
 
 The weights were fitted on a *random* 120/80 split, not the official stratified
-one, so O+ is an experimental variant held to the same both-splits bar rather
-than a promotion. Re-run with the same committed weights on the official
-deterministic stratified split, it still generalises — this is the run you can
-reproduce:
+one. Re-run with the same committed weights on the official deterministic
+stratified split, it gains on both halves — this is the run you can reproduce:
 
 | Split | n | HR@10 | MRR | MTTC | Efficiency | Score |
 |---|---:|---:|---:|---:|---:|---:|
@@ -668,14 +676,18 @@ Which split you use moves the halves, not the total:
 | Official stratified split | 0.9189 | 0.9097 | 0.9152 |
 
 Both splittings agree exactly on all 200 sessions at `0.9152`, and the dev
-versus holdout gap flips sign between them. That is the whole argument for
-treating O+ as unfinished: the number that looks like a holdout result depends
-on which sessions the fit happened to see. A clean fit on the official
-development split is the follow-up before any promotion.
+versus holdout gap flips sign between them.
 
-These O+ figures were produced by hand from the committed weights and are
-quoted to four decimal places; `results.jsonl` holds no reportable O+ row yet,
-so they are diagnostic, not evidence under the retention rules.
+**Two caveats belong with those numbers.** The fit drew its training half from a
+random split of all 200 public sessions, so it saw a large share of the official
+80-session holdout; O+'s holdout figure is therefore not an untouched result in
+the way P, R and S's are, and it is a weaker claim than the "exploratory" label
+carried by Q, T and O. And these figures are quoted to four decimal places
+because they were produced by hand from the committed weights: `results.jsonl`
+holds no reportable O+ row yet, so nothing here has passed the clean-tree
+evidence gate the other rows did. A clean fit on the official development split,
+and a reportable run of both splits, are the outstanding work on the submission
+configuration.
 
 A change is retained only if it gains on **both** splits without a severe
 scenario regression.
@@ -701,8 +713,10 @@ provider is shipped: the evaluator pins it off and records why, so an H row
 measures the unchanged offline path rather than an LLM result.
 
 The values below are transcribed from the reportable `results.jsonl` rows for
-the submission configuration at commit `fedd07e8`; `src.eval.runner` records
-every field automatically.
+configuration O at commit `fedd07e8`; `src.eval.runner` records every field
+automatically. O+ changes eight scoring constants and nothing about retrieval or
+model loading, so the cost and latency profile is the same — but that is
+reasoning from the change, not a measurement of O+.
 
 | Field | Dev split | Holdout split |
 |---|---|---|
@@ -754,20 +768,23 @@ off it.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-## Roadmap
+## Project status
 
-- [x] Deterministic parser with session memory and change-of-mind handling
-- [x] Keyword search plus a clarification question every turn
-- [x] Optional offline meaning-based search, merged with keyword results
-- [x] Clarification chosen by how well a question splits the candidates
-- [x] No-repeat recommendations and disclosure-order ranking (configuration O)
-- [ ] Refit O's scoring weights on the official development split (O+ used a random split)
-- [ ] Gate the parked ideas: L, AA, W, X, Y, J
-- [ ] Cross-encoder (G) and LLM rerank (H), both blocked on an unspecified component
-- [ ] Improve Boundary scenario recall, the weakest cell on holdout
+**The submission is configuration `O+`** — O with eight refitted scoring
+constants — and it is what a bare `Agent()` builds with no environment variables
+set. The agent runs end to end, offline, over all 200 public sessions.
 
-See the [open issues](https://github.com/Danixjg/TrippyShoppy/issues) for the current
-list.
+One piece of paperwork is outstanding: O+ has no reportable row in
+`results.jsonl` yet, so its figures on this page are hand-run rather than
+written by `src.eval.runner` on a clean tree. Every other number here comes from
+that evidence log. The [experiment log](#the-experiment-log) states the caveats
+that go with promoting it.
+
+The remaining letters are research, not unfinished submission work. `G` and `H`
+name optional components the plan never specifies, and `L`, `AA`, `W`, `X`, `Y`
+and `J` are runnable variants that were not retained. None of them is reachable
+from the graded path. [Limitations](#limitations) sets out the honest edges of
+what does ship.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 

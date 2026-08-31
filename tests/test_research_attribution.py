@@ -246,7 +246,7 @@ def test_default_config_is_the_documented_submission_configuration(
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
     declared = re.search(
-        r"\*\*Configuration ([A-Z]) is the submission configuration\.\*\*", readme
+        r"\*\*Configuration ([A-Z]+\+?) is the submission configuration\.\*\*", readme
     )
 
     assert declared, "the README must name a submission configuration"
