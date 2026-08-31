@@ -421,10 +421,22 @@ provider. Neither is claimed as completed.
 
 ## Cost, latency, and network disclosure
 
-Configs A–G, P, Q, and U use zero prompt tokens, zero completion tokens, and no
-paid service, so their model cost is $0. They run fully offline after the
-catalog and selected local dependencies are present. Experimental results
-remain subject to their stated retention gates.
+Every configuration in the ablation table (A, B, C, D, E, F, G, H, P, Q, R, S,
+T, U, V, W, X, Y, J, N, O, and Z) uses zero prompt tokens, zero completion
+tokens, and no paid service, so the model cost of each is $0. All of them run
+fully offline once the catalog and the selected local dependencies are present.
+The vendored embedding model is loaded with `local_files_only`, and no
+configuration opens a network connection at construction or on any turn.
+
+Two configurations name an optional component and remain $0 when it is absent.
+G requests a local cross-encoder and preserves the incoming order without an
+online download when that model is missing. H requests LLM ranking, but no
+implementation or provider is shipped: the evaluator pins the effective
+`llm_rank` to false and records the reason, so an H row measures the unchanged
+offline path rather than an LLM result. Hybrid configurations likewise degrade
+to the deterministic BM25 route when the optional dense install is absent.
+
+Experimental results remain subject to their stated retention gates.
 
 ## Limitations
 
