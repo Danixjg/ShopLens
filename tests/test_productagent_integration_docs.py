@@ -13,7 +13,7 @@ PUBLIC_CREDIT = (
     ROOT / "docs" / "release-checklist.md",
 )
 # Measured by the authors on their own 1M-item AliMe KG corpus with an LLM
-# agent. They are not ShopLens evidence and must never reach a results surface.
+# agent. They are not TrippyShoppy evidence and must never reach a results surface.
 PAPER_ONLY_METRICS = ("32.00", "30.20", "69.00", "8.27", "6.11")
 
 
@@ -102,7 +102,7 @@ def test_adoption_matrix_has_adopt_evaluate_and_defer_decisions() -> None:
     assert not missing
 
 
-def test_adoption_boundary_preserves_shoplens_contracts() -> None:
+def test_adoption_boundary_preserves_trippyshoppy_contracts() -> None:
     text = _read(INTEGRATION_RECORD).casefold()
     required = {
         "offline determinism",
@@ -154,7 +154,7 @@ def test_release_facing_docs_state_the_non_permissive_license() -> None:
         assert "arxiv non-exclusive distribution license" in text, path
 
 
-def test_paper_metrics_never_reach_a_shoplens_results_surface() -> None:
+def test_paper_metrics_never_reach_a_trippyshoppy_results_surface() -> None:
     tracked_docs = subprocess.run(
         ["git", "ls-files", "*.md"],
         cwd=ROOT,

@@ -63,7 +63,7 @@ def test_adoption_matrix_has_adopt_evaluate_and_defer_decisions() -> None:
     assert not missing
 
 
-def test_adoption_boundary_preserves_shoplens_contracts() -> None:
+def test_adoption_boundary_preserves_trippyshoppy_contracts() -> None:
     text = _read(INTEGRATION_RECORD).casefold()
     required = {
         "offline determinism",

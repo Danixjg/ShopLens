@@ -224,7 +224,7 @@ def main() -> None:
         )
 
     out_path = Path(
-        r"C:\Users\thaqi\AppData\Local\Temp\claude\C--Users-thaqi-ShopLens\2a991697-c7a4-418d-a76d-dbe7f1cf4889\scratchpad\redundancy_clarification.json"
+        r"C:\Users\thaqi\AppData\Local\Temp\claude\C--Users-thaqi-TrippyShoppy\2a991697-c7a4-418d-a76d-dbe7f1cf4889\scratchpad\redundancy_clarification.json"
     )
     with out_path.open("w", encoding="utf-8") as handle:
         json.dump(session_reports, handle)

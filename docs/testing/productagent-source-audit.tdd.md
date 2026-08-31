@@ -21,7 +21,7 @@ gating, belong to a later cycle behind a named ablation config.
 2. As a maintainer, I want adopt/evaluate/defer decisions and architecture
    guards so that later experiments preserve the competition contract.
 3. As a reviewer, I want attribution linked from the repository entry points,
-   and the paper's own measurements kept off ShopLens results surfaces, so that
+   and the paper's own measurements kept off TrippyShoppy results surfaces, so that
    provenance and evidence integrity both stay visible during release review.
 
 ## License verification
@@ -51,7 +51,7 @@ false license claim in public release documentation.
 | Write the source audit and adoption boundary | `tests/test_productagent_integration_docs.py` citation, license, audit, matrix, and guard tests | `python3 -m pytest -q tests/test_productagent_integration_docs.py` reported `10 failed, 1 passed`; the record did not exist. | The same command reported `11 passed in 0.17s` after the record and links were added. |
 | Keep the conversion and the release archive out of Git | `test_local_transcript_is_ignored_and_untracked`, `test_release_asset_archives_are_ignored` | Both failed: the conversion was present as untracked `docs/10-implementation-checklist.md` with no ignore rule, and `data/catalog.jsonl.gz` matched no ignore rule. | Renamed to `docs/ProductAgent.md` and ignored; `data/*.gz` ignored. `git status --porcelain` now lists neither. |
 | Link attribution from every entry point | `test_repository_entry_points_link_the_integration_record`, `test_release_facing_docs_contain_full_paper_credit`, `test_release_facing_docs_state_the_non_permissive_license` | Failed for the absent links and credit. | Passed after README, data attribution, data provenance, research attribution, and the release checklist were updated. |
-| Keep the paper's measurements off ShopLens results surfaces | `test_paper_metrics_never_reach_a_shoplens_results_surface` | Green from the start; it is a regression guard, not a new behavior. | Still green with the audit record present, which is the only tracked file permitted to carry those values. |
+| Keep the paper's measurements off TrippyShoppy results surfaces | `test_paper_metrics_never_reach_a_trippyshoppy_results_surface` | Green from the start; it is a regression guard, not a new behavior. | Still green with the audit record present, which is the only tracked file permitted to carry those values. |
 
 Two assertions failed at first GREEN for a mechanical reason: the paper title
 and the phrase "does not grant" are line-wrapped in the record, so raw
@@ -69,11 +69,11 @@ criterion was weakened.
 | 2 | The record states the arXiv license URL, its operative grant, and that it grants nothing to third parties. | `test_source_audit_records_the_arxiv_license_grant` | Documentation contract | PASS | Targeted run: 11 passed |
 | 3 | Upstream code and AliMe KG are classified do not import, and the local conversion do not redistribute. | `test_source_audit_blocks_copying_artifacts_without_clear_terms` | Documentation contract | PASS | Targeted run: 11 passed |
 | 4 | The adoption matrix carries adopt, evaluate, defer, and do-not-adopt decisions, including Text2SQL. | `test_adoption_matrix_has_adopt_evaluate_and_defer_decisions` | Architecture contract | PASS | Targeted run: 11 passed |
-| 5 | Offline determinism, the Agent contract, immutable catalog, read-only evaluator, and dev-only tuning are explicit guards. | `test_adoption_boundary_preserves_shoplens_contracts` | Architecture contract | PASS | Targeted run: 11 passed |
+| 5 | Offline determinism, the Agent contract, immutable catalog, read-only evaluator, and dev-only tuning are explicit guards. | `test_adoption_boundary_preserves_trippyshoppy_contracts` | Architecture contract | PASS | Targeted run: 11 passed |
 | 6 | README, data attribution, data provenance, and research attribution all link the audit. | `test_repository_entry_points_link_the_integration_record` | Integration | PASS | Targeted run: 11 passed |
 | 7 | Release-facing documents carry the full paper credit. | `test_release_facing_docs_contain_full_paper_credit` | Release | PASS | Targeted run: 11 passed |
 | 8 | Release-facing documents state the non-permissive license rather than implying reuse rights. | `test_release_facing_docs_state_the_non_permissive_license` | Release | PASS | Targeted run: 11 passed |
-| 9 | No tracked Markdown outside the audit carries a ProductAgent-reported metric. | `test_paper_metrics_never_reach_a_shoplens_results_surface` | Evidence integrity | PASS | Targeted run: 11 passed |
+| 9 | No tracked Markdown outside the audit carries a ProductAgent-reported metric. | `test_paper_metrics_never_reach_a_trippyshoppy_results_surface` | Evidence integrity | PASS | Targeted run: 11 passed |
 | 10 | The local conversion is ignored and untracked, under both its old and new path. | `test_local_transcript_is_ignored_and_untracked` | Release | PASS | Targeted run: 11 passed |
 | 11 | The downloaded catalog release archive cannot be committed. | `test_release_asset_archives_are_ignored` | Release | PASS | Targeted run: 11 passed |
 
@@ -104,10 +104,10 @@ applicable here.
 - The audit records a license finding, not legal advice. If a peer-reviewed
   version, a licensed implementation, or an explicit dataset license appears,
   the audit must be re-derived from the primary records.
-- `test_paper_metrics_never_reach_a_shoplens_results_surface` guards a fixed
+- `test_paper_metrics_never_reach_a_trippyshoppy_results_surface` guards a fixed
   set of distinctive values. It reduces the risk of a numbers leak; it does not
   prove that no paraphrased claim from the paper was ever misattributed to
-  ShopLens evidence.
+  TrippyShoppy evidence.
 - The adopted behavioral ideas are documented but not implemented. Nothing in
   this cycle changes agent behavior, and no evaluation run was performed or
   needed.

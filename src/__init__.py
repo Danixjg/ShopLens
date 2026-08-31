@@ -1,4 +1,4 @@
-"""ShopLens offline conversational shopping agent."""
+"""TrippyShoppy offline conversational shopping agent."""
 
 from .agent import Agent
 

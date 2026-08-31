@@ -30,10 +30,6 @@
 </p>
 </div>
 
-> The repository was renamed from `ShopLens`, and the code still carries that
-> name: the package paths, the `SHOPLENS_CONFIG` and `SHOPLENS_CATALOG_SHA256`
-> variables, and the `shoplens-*` log paths are all unchanged.
-
 <details>
   <summary><b>Table of contents</b></summary>
   <ol>
@@ -297,8 +293,8 @@ walkthrough it is built around.
 [every configuration](#every-configuration) for the full list.
 
 ```bash
-SHOPLENS_CONFIG=A python3 -m evaluator.local_evaluator   # keyword-only baseline
-SHOPLENS_CONFIG=P python3 -m evaluator.local_evaluator   # conservative candidate
+TRIPPYSHOPPY_CONFIG=A python3 -m evaluator.local_evaluator   # keyword-only baseline
+TRIPPYSHOPPY_CONFIG=P python3 -m evaluator.local_evaluator   # conservative candidate
 ```
 
 **Settings.** The system reads exactly two environment variables. Both are
@@ -306,11 +302,13 @@ optional, and the defaults are what the official harness gets.
 
 | Variable | Default | What it does |
 |---|---|---|
-| `SHOPLENS_CONFIG` | submission configuration `O+` | Picks a named configuration. An unknown name falls back to baseline `A`. Read in `src/contracts/config.py`. |
-| `SHOPLENS_CATALOG_SHA256` | unset | Checks a **custom** catalog file against a digest you supply. The official catalog path is always verified anyway, and this cannot switch that off. Read in `src/agent.py`. |
+| `TRIPPYSHOPPY_CONFIG` | submission configuration `O+` | Picks a named configuration. An unknown name falls back to baseline `A`. Read in `src/contracts/config.py`. |
+| `TRIPPYSHOPPY_CATALOG_SHA256` | unset | Checks a **custom** catalog file against a digest you supply. The official catalog path is always verified anyway, and this cannot switch that off. Read in `src/agent.py`. |
 
-There is no API key, token or endpoint variable, because the agent never makes a
-network call.
+Both were renamed along with the project, so an export of either old variable
+name is now ignored rather than honoured — worth checking your shell if a run
+picks a configuration you did not expect. There is no API key, token or endpoint
+variable, because the agent never makes a network call.
 
 <details>
 <summary><b>Splits, evidence logging and the final evaluation</b></summary>
@@ -335,7 +333,7 @@ repository:
 
 ```bash
 python3 -m src.eval.runner --config P --split dev \
-  --allow-dirty --results-log /tmp/shoplens-p-dev.jsonl
+  --allow-dirty --results-log /tmp/trippyshoppy-p-dev.jsonl
 ```
 
 Each row also records Python version, platform, model and vector digests,
@@ -608,7 +606,7 @@ the cost of never asking anything.
 
 <br />
 
-Pick one with `SHOPLENS_CONFIG`. Unset selects the submission configuration O+;
+Pick one with `TRIPPYSHOPPY_CONFIG`. Unset selects the submission configuration O+;
 an unknown value falls back safely to baseline A. Configurations that use
 meaning-based search degrade to keyword-only when the optional packages are
 absent.

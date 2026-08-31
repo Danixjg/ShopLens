@@ -85,7 +85,7 @@
       non-exclusive distribution license 1.0, which grants no third-party
       redistribution or derivative right. No copy or local conversion of it is
       tracked, and `docs/ProductAgent.md` is Git-ignored and untracked.
-- [x] No ProductAgent-reported metric appears on a ShopLens results surface;
+- [x] No ProductAgent-reported metric appears on a TrippyShoppy results surface;
       those values were measured on AliMe KG with an LLM agent and belong only
       to `docs/productagent-integration.md`.
 
@@ -95,7 +95,7 @@
 - [x] Both ideas that audit governs were measured under pre-registered dev
       gates and neither was retained: U was rejected at `0.819730` against
       P's `0.819939`, and V tied P exactly at `0.819939`. No WoS-reported
-      metric appears on a ShopLens results surface.
+      metric appears on a TrippyShoppy results surface.
 
 ## Final package
 

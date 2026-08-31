@@ -442,7 +442,7 @@ def _capability_status(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run a reproducible ShopLens ablation")
+    parser = argparse.ArgumentParser(description="Run a reproducible TrippyShoppy ablation")
     parser.add_argument("--catalog", default="data/catalog.jsonl")
     parser.add_argument("--dataset", default="data/public_set.jsonl")
     parser.add_argument("--config", default=None)
@@ -511,7 +511,7 @@ def main() -> None:
     execution_catalog = catalog_path
     execution_dataset = dataset_path
     if not args.allow_dirty:
-        input_snapshot = tempfile.TemporaryDirectory(prefix="shoplens-eval-")
+        input_snapshot = tempfile.TemporaryDirectory(prefix="trippyshoppy-eval-")
         snapshot_root = Path(input_snapshot.name)
         execution_catalog = snapshot_root / "catalog.jsonl"
         execution_dataset = snapshot_root / "public_set.jsonl"
@@ -529,9 +529,9 @@ def main() -> None:
     cache_path = execution_catalog.with_suffix(".embeddings.npz")
     cache_existed_before = cache_path.is_file()
     started = time.perf_counter()
-    prior_checksum = os.environ.get("SHOPLENS_CATALOG_SHA256")
+    prior_checksum = os.environ.get("TRIPPYSHOPPY_CATALOG_SHA256")
     if input_snapshot is not None:
-        os.environ["SHOPLENS_CATALOG_SHA256"] = catalog_digest_before
+        os.environ["TRIPPYSHOPPY_CATALOG_SHA256"] = catalog_digest_before
     construction_started = time.perf_counter()
     try:
         agent = Agent(execution_catalog, config=config)
@@ -539,9 +539,9 @@ def main() -> None:
         agent_init_seconds = time.perf_counter() - construction_started
         if input_snapshot is not None:
             if prior_checksum is None:
-                os.environ.pop("SHOPLENS_CATALOG_SHA256", None)
+                os.environ.pop("TRIPPYSHOPPY_CATALOG_SHA256", None)
             else:
-                os.environ["SHOPLENS_CATALOG_SHA256"] = prior_checksum
+                os.environ["TRIPPYSHOPPY_CATALOG_SHA256"] = prior_checksum
     proxy = _EvaluatorAgentProxy(agent, catalog_ids)
     dense = _dense_retriever(agent)
     model_digest_before = dense.model_sha256 if dense is not None else None

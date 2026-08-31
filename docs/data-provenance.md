@@ -14,7 +14,7 @@ rows              50000
 ```
 
 At runtime, the Agent automatically verifies these decompressed bytes whenever
-the official default path is used. `SHOPLENS_CATALOG_SHA256` enables the same
+the official default path is used. `TRIPPYSHOPPY_CATALOG_SHA256` enables the same
 check for a custom path; the official path has no bypass. Loading fails on a checksum mismatch, a missing
 identifier, or a duplicate identifier. The loader exposes immutable product
 records and the system never writes to the catalog.
@@ -28,7 +28,7 @@ verified vendored model in-process.
 
 ## Research-derived methods
 
-ShopLens's planned tri-state preference and catalog-aware dialogue-policy
+TrippyShoppy's planned tri-state preference and catalog-aware dialogue-policy
 experiments are informed by Li et al.'s TRACER method. They are independent
 implementations against the competition's immutable Amazon Reviews 2023
 catalog; no upstream TRACER source files or WoS dataset records are part of the
