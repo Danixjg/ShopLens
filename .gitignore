@@ -8,6 +8,8 @@ __pycache__/
 .venv-wsl/
 venv/
 results.json
+# Diagnostic transcripts from scripts/error_analysis.py.
+error_analysis.json
 data/catalog.jsonl
 data/catalog.embeddings.npz
 data/releases/
