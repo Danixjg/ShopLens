@@ -55,6 +55,7 @@ class Agent:
             explicit_checksum,
             uses_default_path or uses_official_path,
             build_facets=self.config.clarification in {"info_gain", "expected_value"},
+            build_constraint_index=self.config.catalog_grounded_segmentation,
         )
         self.retriever = build_retriever(self.catalog, self.config)
         self.constraint_scorer = ConstraintScorer(self.catalog)
@@ -78,7 +79,9 @@ class Agent:
             if self.config.profile_rerank
             else None
         )
-        self.parser = TurnParser()
+        # A catalog built without the index yields None, which is the
+        # historical split-on-every-semicolon behaviour.
+        self.parser = TurnParser(getattr(self.catalog, "constraint_index", None))
         self.policy = ClarificationPolicy(self.config, self.catalog)
         self._sessions: dict[str, SessionState] = {}
         self.exception_count = 0
@@ -90,6 +93,7 @@ class Agent:
         enforce_official_checksum: bool,
         *,
         build_facets: bool,
+        build_constraint_index: bool = False,
     ) -> tuple[Catalog, bool | None]:
         """Load a catalog while enforcing every checksum that applies.
 
@@ -103,10 +107,20 @@ class Agent:
                 path,
                 expected_sha256=OFFICIAL_CATALOG_SHA256,
                 build_facets=build_facets,
+                build_constraint_index=build_constraint_index,
             ), True
         if explicit_checksum is not None:
-            return Catalog(path, expected_sha256=explicit_checksum, build_facets=build_facets), True
-        return Catalog(path, build_facets=build_facets), None
+            return Catalog(
+                path,
+                expected_sha256=explicit_checksum,
+                build_facets=build_facets,
+                build_constraint_index=build_constraint_index,
+            ), True
+        return Catalog(
+            path,
+            build_facets=build_facets,
+            build_constraint_index=build_constraint_index,
+        ), None
 
     def reset(self, session_id: str, user_profile: dict) -> None:
         self._sessions[str(session_id)] = SessionState(
