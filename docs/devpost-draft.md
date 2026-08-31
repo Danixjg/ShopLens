@@ -111,6 +111,28 @@ below P's pre-registered `0.819939` threshold. We therefore rejected U and did
 not open holdout. This negative result is retained because it separates an
 appealing research framing from a measured competition improvement.
 
+Config K fixes a parser defect and was rejected on the same discipline. The
+simulator joins disclosed constraints with `"; "`, but catalog text uses `;` as
+ordinary punctuation, so a single feature bullet such as `Solid colors: 100%
+Cotton; Heather Grey: 90% Cotton, 10% Polyester` was split into three
+constraints. K resolves each disclosure against the set of values the catalog
+could have supplied. Segmentation accuracy was measured first and separately,
+against the simulator's own disclosure list rather than against a score:
+over-splits fall from 3 to 0 on dev and 3 to 0 on holdout, with under-splits at
+0 on both, and 0 under-splits across 196,680 synthetic disclosures. Its
+pre-registered gate required it to strictly beat O's `0.908416`. It tied
+exactly, at HR@10 `0.983333`, MRR `0.844722` and MTTC `2.833333`, so the flag
+remains off and O is unchanged.
+
+The tie is itself the finding. The defect never reached the score: the
+constraint scorer unions terms across an attribute's values, so one slot and
+three produce an identical term set, and the retrieval query differs only by
+punctuation the tokenizer discards. The only real effect was that one
+disclosure occupied three leading positions in the disclosure-order match
+vector instead of one, and in the affected sessions that reordering moved no
+target's rank. We keep the correction and its property test because the
+codebase is more correct with them, and we report that it bought nothing.
+
 ## Limitations and future work
 
 - Boundary remains the smallest and noisiest scenario bucket (six dev and four
