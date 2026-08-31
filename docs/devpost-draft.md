@@ -130,6 +130,13 @@ accounted for most of `O`'s development gain; `N` has no reportable row, so its
 diagnostic score is not presented as formal evidence. Disclosure-order ranking
 then improved ordering without changing the frozen Top-K membership.
 
+Config `K` corrects semicolon-delimited constraint segmentation but did not
+change accuracy. It reduced over-splits from 3 to 0 on both public splits, with
+no under-splits there or across 196,680 synthetic disclosures. Its clean dev run
+at `6c8135f` tied `O` exactly—HR@10 `0.983333`, MRR `0.844722`, MTTC `2.833333`,
+and TechnicalScore `0.908416`—so the flag remains off while its property test is
+retained.
+
 Configuration `O` produced the following reportable outcomes:
 
 | Split | Sessions | HR@10 | MRR | MTTC | TechnicalScore |
