@@ -66,21 +66,74 @@ evidence without erasing unrelated constraints.
 - Python 3.10 or newer (tested here with Python 3.12).
 - SQLite compiled with FTS5, as in standard CPython distributions.
 - No Python packages are required for config A, the deterministic BM25 baseline.
+  `requirements.txt` is a note recording that, not an install list.
 - Hybrid/dense configs require `numpy`, `sentence-transformers`, and the
   locally vendored `models/all-MiniLM-L6-v2/` directory.
+- The commands below are POSIX shell and assume `curl`, `sha256sum`, and `gzip`.
+  On Windows they run as written under Git Bash or WSL. Everything except a
+  *reportable* `src.eval.runner` run works on any platform; see
+  [Platform requirements for reportable runs](#platform-requirements-for-reportable-runs).
 
-Download the release assets `catalog.jsonl.gz` and `SHA256SUMS`, verify the
-compressed asset, and place the decompressed file at `data/catalog.jsonl`:
+Clone the repository first:
 
 ```bash
-sha256sum --check SHA256SUMS
-gzip -dk catalog.jsonl.gz
-mv catalog.jsonl data/catalog.jsonl
+git clone https://github.com/Danixjg/ShopLens.git
+cd ShopLens
+```
+
+Use a virtual environment. If you create it inside the repository, name it
+`.venv`, `.venv-dense`, `.venv-wsl`, or `venv` — those are the names
+`.gitignore` covers. Any other name, or any other stray file, leaves the tree
+untracked-dirty and `src.eval.runner` will refuse a reportable run with a
+message about uncommitted implementation changes:
+
+```bash
+python3 -m venv .venv
+. .venv/bin/activate      # Windows: . .venv/Scripts/activate
+```
+
+The 50,000-product catalog is not tracked in this repository. Download it from
+the organizer's participant-kit release, verify the compressed asset, and place
+the decompressed file at `data/catalog.jsonl`. Run these from the repository
+root:
+
+```bash
+BASE=https://github.com/TechJam2026/techjam-conversational-search/releases/download/participant-kit
+curl -L -o data/catalog.jsonl.gz "$BASE/catalog.jsonl.gz"
+curl -L -o data/SHA256SUMS "$BASE/SHA256SUMS"
+(cd data && sha256sum --ignore-missing --check SHA256SUMS)
+gzip -dk data/catalog.jsonl.gz
+rm data/SHA256SUMS
 python3 -m pip install -r requirements-dev.txt
 python3 -m pytest -q
 ```
 
-Install the portable optional dependencies before running hybrid configs:
+Release page:
+<https://github.com/TechJam2026/techjam-conversational-search/releases/tag/participant-kit>
+
+Both downloads land in `data/`, where `.gitignore` already covers the archive
+and the decompressed catalog; `SHA256SUMS` is removed after the check so the
+working tree stays clean, which the reportable runner requires.
+`--ignore-missing` is required because `SHA256SUMS` also lists
+`techjam-participant-kit.zip`. That asset is the organizer's starter kit, which
+this repository already supersedes; it is not needed here and is deliberately
+not downloaded. Without the flag the check reports it missing and exits
+non-zero even when the catalog is correct. The decompressed file must be 50,000
+rows with SHA-256
+`da979b05a68af864cb0dcf9ee6a81c010c7e66a57978ad286c7a2e005fc69a67`, which
+`Agent` re-verifies at load time. Both digests, the row count, and the pinned
+public-set digest are recorded in
+[data provenance and integrity](docs/data-provenance.md); the dataset files
+themselves are described in [`data/README.md`](data/README.md). Note that
+`python3 -m pytest -q` passes with no catalog present, so it does not by itself
+confirm a complete setup; the
+digest above is the check that does.
+
+Install the portable optional dependencies before running hybrid configs. The
+first hybrid run then embeds all 50,000 products on CPU before its first
+session, which takes roughly 20-25 minutes and writes a ~70 MB cache to the
+ignored path `data/catalog.embeddings.npz`. Every later run reuses that cache
+and starts in seconds:
 
 ```bash
 python3 -m pip install -r requirements-dense.txt
@@ -118,6 +171,19 @@ The default and repository-absolute catalog paths always enforce the official
 digest. For fixture diagnostics, pass a custom path and its explicit checksum;
 there is no verification bypass for the official path.
 
+### Environment variables
+
+The system reads exactly two environment variables. Both are optional, and the
+defaults are what the official harness gets.
+
+| Variable | Default | Effect |
+|---|---|---|
+| `SHOPLENS_CONFIG` | submission configuration `O` | Selects a named ablation. An unknown name falls back to baseline `A`. Read in `src/contracts/config.py`. |
+| `SHOPLENS_CATALOG_SHA256` | unset | Enforces a load-time digest for a **custom** catalog path. The official path is always verified regardless, and this variable cannot bypass it. Read in `src/agent.py`. |
+
+No credential, API-key, token, or endpoint variable exists or is read; the agent
+makes no network calls.
+
 The repository deliberately loads dense and reranker models by local path,
 never by model name. The embedding model is pinned and documented in
 `models/README.md`. Dense catalog embeddings are computed locally and may be
@@ -138,6 +204,23 @@ route rather than failing:
 ```bash
 python3 -m evaluator.local_evaluator
 ```
+
+Expect one of these two results over the 200 public sessions, depending on
+whether the optional dense stack is installed:
+
+| Route | HR@10 | MRR | MTTC | Efficiency | TechnicalScore |
+|---|---:|---:|---:|---:|---:|
+| Hybrid (dense installed) | 0.985 | 0.825226 | 2.775 | 0.8225 | **0.904568** |
+| BM25 fallback (dense absent) | 0.985 | 0.880478 | 3.000 | 0.8000 | **0.916643** |
+
+**The fallback is not score-neutral, and on this public set it scores higher.**
+Both routes find the target in the same 98.5% of sessions; the BM25 route ranks
+it better once found and takes longer to get there. Do not read the larger
+number as an improvement, and do not compare it against the dev/holdout tables
+below, which are hybrid-only and computed on 120/80 splits rather than all 200
+sessions. Check `effective_retriever` in a `src.eval.runner` row, or simply
+whether `numpy` and `sentence-transformers` are importable, to know which route
+produced a given number.
 
 Name any other ablation explicitly, for example the standard-library baseline A
 or the conservative clean-holdout candidate P:
@@ -163,10 +246,66 @@ python3 -m src.eval.runner --config P --split dev \
   --allow-dirty --results-log /tmp/shoplens-p-dev.jsonl
 ```
 
+### Platform requirements for reportable runs
+
+The competition sets no platform requirement. Section 3 of the organizer's
+final-evaluation FAQ states that there is no standardized CPU, RAM, GPU,
+startup-time, or per-response limit, because teams run the final evaluation in
+their own environments. `evaluator.local_evaluator` therefore runs anywhere
+Python 3.10+ runs, including Windows and macOS, and that is the command an
+examiner should use.
+
+The stricter conditions below are a control this project imposes on its own
+evidence log, not a competition rule. `src.eval.runner` refuses a **reportable**
+run unless:
+
+- POSIX advisory file locking (`fcntl`) is available, so concurrent writers
+  cannot interleave rows in `results.jsonl`. This excludes Windows.
+- For any non-BM25 config, the interpreter is CPython 3.12 on Linux x86-64 and
+  every package matches `requirements-dense.lock.txt` exactly.
+- Dense vectors were rebuilt in-process from the pinned model rather than read
+  from a cache. The organizer's FAQ section 4 explicitly permits precomputed
+  local artifacts; this repository declines the allowance for reportable rows
+  only, and a cold reportable dense run therefore spends roughly 22 minutes
+  embedding the catalog before the first session.
+
+On any other platform, use `--allow-dirty --results-log <path outside the repo>`.
+Those runs are diagnostics by definition, and the runner records exactly why in
+`reportability_reasons`. The metrics themselves are portable: config O, P and
+their splits reproduce to six decimal places on Windows x86-64 with an unpinned
+dense stack, differing from the reference lock in 57 packages.
+
+TechnicalScore is the organizer's recommended composite, defined in
+[`docs/evaluation_config.json`](docs/evaluation_config.json):
+
+```text
+efficiency      = clip((11 - MTTC) / 10, 0, 1)
+TechnicalScore  = 0.50 * HitRate@10 + 0.30 * MRR + 0.20 * efficiency
+```
+
+A session that never surfaces the target counts as turn 11 for MTTC. Because
+HitRate carries half the weight and reranking cannot change Top-10 membership in
+the submission configuration, reranking moves TechnicalScore only through the
+0.30 MRR term.
+
 The public organizer starter (which does not ask clarification questions)
 reports HR@10 `0.125`, MRR `0.068034`, MTTC `9.81`, and TechnicalScore
-`0.10671`. Config A is an honest BM25 baseline with clarification enabled and
-is therefore not directly comparable.
+`0.10671`, as published in
+[`docs/baseline_results.json`](docs/baseline_results.json). That starter agent
+is not vendored here, so the figure is quoted rather than regenerated. Config A
+is an honest BM25 baseline with clarification enabled and is therefore not
+directly comparable.
+
+A single scripted session is useful for inspecting behaviour by hand:
+
+```bash
+python3 scripts/demo_session.py --config O
+```
+
+The script draws box-rule characters, so on a Windows console prefix it with
+`PYTHONIOENCODING=utf-8` to avoid a `UnicodeEncodeError` from the default
+cp1252 codec. See [demo script](docs/demo-script.md) for the walkthrough it is
+built around.
 
 Reportable results are generated by `src.eval.runner` only from an identifiable
 clean implementation whose requested local capabilities actually loaded and
@@ -175,6 +314,32 @@ records those capability checks and fallback count alongside config flags,
 locked dependencies, platform, pinned model and vector digests, catalog and
 dataset digests, cache provenance, latency, memory, and four Git-state gates.
 Dev and holdout use the deterministic stratified 120/80 split.
+
+### Final evaluation procedure
+
+The 800 final evaluation sessions are released **after** the Devpost submission
+deadline, and are run against the commit submitted before it. Nothing in this
+repository can contain those results in advance, which is why `results.json` is
+untracked: the file that matters is generated later, not committed here.
+
+When the final package is released:
+
+1. Check out the exact submitted commit. Do not modify the Agent, its
+   configuration, indexes, or any other solution component afterwards.
+2. Run the **unmodified** official evaluator, `evaluator/local_evaluator.py`,
+   against the released sessions. Do not substitute `src.eval.runner`, which is
+   this project's own split harness; it wraps the official `evaluate()` for
+   internal ablations and is not the submission path.
+3. Retain the generated `results.json` **including its per-session
+   `sessions` array**, together with the submitted commit hash and the
+   environment and execution details listed under
+   [Environment and execution disclosure](#environment-and-execution-disclosure).
+   The organizer may request logs or other supporting evidence.
+
+A `results.json` produced from the 200 public sessions is **not** final
+evaluation evidence. If one is present in a working tree from earlier local
+runs, it records the public set and should not be reported or retained as the
+final artifact.
 
 ### Historical reportable baseline
 
@@ -236,6 +401,27 @@ out in [Retention decision](#retention-decision) below.
 | U, expected question value | 0.941667 | 0.641323 | 3.175000 | 0.819730 | — | — | — | — | rejected on dev gate |
 | V, facet population gate | 0.941667 | 0.639239 | 3.133333 | 0.819939 | — | — | — | — | tied P, not retained |
 
+Configurations without a row above hold no reportable evidence and are not
+claimed: **G** and **H** depend on components the plan does not specify (a
+vendored cross-encoder and an LLM provider), and **W**, **X**, **Y**, and **J**
+are research-derived one-flag ablations that are defined and runnable but have
+not been measured under a frozen gate. **N** is the middle rung of the O
+decomposition and is diagnostic only. `results.jsonl` is the source of truth for
+which configurations have been run.
+
+Per-scenario evidence for the submission configuration O:
+
+| Scenario | Dev HR@10 | Dev MRR | Dev MTTC | Holdout HR@10 | Holdout MRR | Holdout MTTC |
+|---|---:|---:|---:|---:|---:|---:|
+| Boundary | 1.0000 | 0.8611 | 3.8333 | 0.7500 | 0.3690 | 4.2500 |
+| Browsing | 0.9792 | 0.8038 | 2.5833 | 1.0000 | 0.8524 | 2.5000 |
+| Buying | 0.9792 | 0.8740 | 2.4583 | 1.0000 | 0.7842 | 2.1250 |
+| Intent Override | 1.0000 | 0.8704 | 4.1667 | 1.0000 | 0.8194 | 4.1667 |
+
+Boundary is the weak scenario on holdout and the honest caveat on O: 6 dev and 4
+holdout sessions, so a single miss moves it by 0.25, and its holdout MRR of
+`0.3690` is the lowest cell in the table.
+
 Q was selected on dev, where against P it improved 50 target ranks, regressed
 none, and left 70 unchanged. HR@10 and MTTC were identical in every scenario.
 Dev MRR rose from P to Q for Boundary (`0.7417` → `0.8889`),
@@ -251,6 +437,8 @@ resamples, seed 2026) estimates Q's dev TechnicalScore gain over P at
 Weighting the frozen dev and holdout aggregates by their 120/80 sample counts
 gives an all-public estimate of HR@10 `0.955`, MRR `0.641488`, MTTC `3.02`,
 and TechnicalScore `0.829546`, without rerunning or retuning on holdout.
+
+P's per-scenario evidence, for comparison against the O table above:
 
 | Scenario | Dev HR@10 | Dev MRR | Dev MTTC | Holdout HR@10 | Holdout MRR | Holdout MTTC |
 |---|---:|---:|---:|---:|---:|---:|
@@ -437,6 +625,38 @@ offline path rather than an LLM result. Hybrid configurations likewise degrade
 to the deterministic BM25 route when the optional dense install is absent.
 
 Experimental results remain subject to their stated retention gates.
+
+### Environment and execution disclosure
+
+Section 3 of the organizer's final-evaluation FAQ asks each team to disclose the
+Python version, hardware, dependencies, runtime, latency, token usage, and
+estimated model cost behind its reported results. The values below are
+transcribed from the reportable `results.jsonl` rows for the submission
+configuration O at commit `fedd07e8`; every field is recorded automatically by
+`src.eval.runner` and can be re-read from that file.
+
+| Field | O / dev | O / holdout |
+|---|---|---|
+| Python | CPython 3.12.13 | CPython 3.12.13 |
+| Platform | Linux x86-64 (WSL2 `6.18.33.2`) | Linux x86-64 (WSL2 `6.18.33.2`) |
+| SQLite | 3.46.1 | 3.46.1 |
+| Compute device | CPU | CPU |
+| Dependencies | `requirements-dense.lock.txt`, hash-pinned, zero mismatches | same |
+| Wall clock | 1340.4 s | 1299.0 s |
+| Of which agent init | 1307.1 s (in-process catalog embedding) | 1274.7 s |
+| Peak RSS | 1.95 GB | 1.98 GB |
+| Turn latency p50 / p95 / p99 | 93.6 / 145.8 / 166.3 ms | 107.9 / 168.1 / 199.2 ms |
+| Turn latency mean / max | 98.4 / 175.3 ms | 113.6 / 311.8 ms |
+| Turns measured | 338 | 214 |
+| Prompt / completion tokens | 0 / 0 | 0 / 0 |
+| Estimated model cost | $0 | $0 |
+
+Nearly all wall-clock time is the one-time in-process embedding of the 50,000
+product catalog, which the reportable path performs deliberately rather than
+reusing a cache. Steady-state cost is the per-turn latency above. Ordinary use
+reuses the fingerprinted cache at `data/catalog.embeddings.npz` and starts in
+seconds. No GPU is used or required; `DenseRetriever` pins `device="cpu"` and
+fails closed if any parameter leaves it.
 
 ## Limitations
 
